@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Dices,
   Coins,
@@ -29,6 +29,8 @@ import {
   Layers,
   ChevronRight,
   Trash2,
+  X,
+  Info,
 } from 'lucide-react'
 
 // รายการช่องเดินบนกระดาน 40 ช่อง (11 x 11 Grid)
@@ -603,6 +605,26 @@ function Game({ setCurrentPage }) {
   // ผลการตัดสินผู้ชนะจากการล้มละลาย: 'player' | 'bot' | null
   const [bankruptcyWinner, setBankruptcyWinner] = useState(null)
 
+  // ช่องที่ดินที่ผู้เล่นกดคลิกเพื่อดูรายละเอียดและค่าเช่า
+  const [inspectingTile, setInspectingTile] = useState(null)
+
+  // References เพื่อป้องกันปัญหา Stale Closures และการค้างในตาบอท
+  const playerRef = useRef(player)
+  const botRef = useRef(bot)
+  const turnRef = useRef(turn)
+  const isRollingRef = useRef(isRolling)
+  const isMovingRef = useRef(isMoving)
+  const debtCrisisRef = useRef(debtCrisis)
+  const bankruptcyWinnerRef = useRef(bankruptcyWinner)
+
+  useEffect(() => { playerRef.current = player }, [player])
+  useEffect(() => { botRef.current = bot }, [bot])
+  useEffect(() => { turnRef.current = turn }, [turn])
+  useEffect(() => { isRollingRef.current = isRolling }, [isRolling])
+  useEffect(() => { isMovingRef.current = isMoving }, [isMoving])
+  useEffect(() => { debtCrisisRef.current = debtCrisis }, [debtCrisis])
+  useEffect(() => { bankruptcyWinnerRef.current = bankruptcyWinner }, [bankruptcyWinner])
+
   // คำนวณราคาขายที่ดินคืนธนาคาร (ราคาซื้อ + มูลค่าอัปเกรด)
   const getTileSellPrice = (tileId) => {
     const tile = INITIAL_TILES[tileId]
@@ -770,7 +792,7 @@ function Game({ setCurrentPage }) {
 
   // จบตาของผู้เล่น หรือให้ทอยต่อหากติดดับเบิ้ล
   const endPlayerTurnOrDouble = (doubleFlag, delay = 1000) => {
-    if (bankruptcyWinner) return
+    if (bankruptcyWinnerRef.current) return
     if (doubleFlag) {
       setTimeout(() => {
         setHasRolled(false)
@@ -785,10 +807,18 @@ function Game({ setCurrentPage }) {
 
   // จบตาของบอท หรือให้บอทเดินต่อหากติดดับเบิ้ล
   const endBotTurn = (doubleFlag, delay = 1000) => {
-    if (bankruptcyWinner) return
+    if (bankruptcyWinnerRef.current) return
     if (doubleFlag) {
       setTimeout(() => {
-        botRollAndMove()
+        if (
+          turnRef.current === 'bot' &&
+          !isMovingRef.current &&
+          !isRollingRef.current &&
+          !debtCrisisRef.current &&
+          !bankruptcyWinnerRef.current
+        ) {
+          botRollAndMove()
+        }
       }, delay)
     } else {
       setTimeout(() => {
@@ -866,19 +896,62 @@ function Game({ setCurrentPage }) {
     }
   }
 
-  // ================= 2. ระบบตาเดินของบอท AI (Bot Turn Automation) =================
+  // ================= 2. ระบบตาเดินของบอท AI (Bot Turn Automation + Watchdog) =================
   useEffect(() => {
-    if (gamePhase !== 'playing' || turn !== 'bot' || isRolling || isMoving) return
+    if (
+      gamePhase !== 'playing' ||
+      turn !== 'bot' ||
+      isRolling ||
+      isMoving ||
+      debtCrisis ||
+      bankruptcyWinner
+    ) {
+      return
+    }
 
     const timer = setTimeout(() => {
-      botRollAndMove()
-    }, 1100)
+      if (
+        turnRef.current === 'bot' &&
+        !isRollingRef.current &&
+        !isMovingRef.current &&
+        !debtCrisisRef.current &&
+        !bankruptcyWinnerRef.current
+      ) {
+        botRollAndMove()
+      }
+    }, 900)
 
-    return () => clearTimeout(timer)
-  }, [turn, gamePhase])
+    // Watchdog Timer: ป้องกันกรณีหลุดหรือค้างเกิน 2.8 วินาทีในตาบอท ให้บอททอยเต๋าทำงานทันที
+    const watchdog = setTimeout(() => {
+      if (
+        turnRef.current === 'bot' &&
+        !isRollingRef.current &&
+        !isMovingRef.current &&
+        !debtCrisisRef.current &&
+        !bankruptcyWinnerRef.current
+      ) {
+        botRollAndMove()
+      }
+    }, 2800)
+
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(watchdog)
+    }
+  }, [turn, gamePhase, isRolling, isMoving, debtCrisis, bankruptcyWinner])
 
   // บอททอยเต๋าและเดิน
   const botRollAndMove = () => {
+    if (
+      isRollingRef.current ||
+      isMovingRef.current ||
+      turnRef.current !== 'bot' ||
+      debtCrisisRef.current ||
+      bankruptcyWinnerRef.current
+    ) {
+      return
+    }
+
     setIsRolling(true)
     let count = 0
     const interval = setInterval(() => {
@@ -961,7 +1034,7 @@ function Game({ setCurrentPage }) {
   const animateWalking = (totalSteps, actor, doubleFlag = false) => {
     setIsMoving(true)
     let currentStep = 0
-    let currentPos = actor === 'player' ? player.pos : bot.pos
+    let currentPos = actor === 'player' ? playerRef.current.pos : botRef.current.pos
 
     const walkInterval = setInterval(() => {
       currentStep++
@@ -1150,9 +1223,15 @@ function Game({ setCurrentPage }) {
             endPlayerTurnOrDouble(doubleFlag, 1000)
           }
         } else {
-          // ที่ดินว่าง: รอผู้เล่นตัดสินใจ ซื้อ หรือ ข้าม
-          addLog(`🏙️ คุณตกที่ดินว่าง: ${tile.name} (ราคา ฿${tile.price.toLocaleString()})`)
-          return
+          // ที่ดินว่าง: รอผู้เล่นตัดสินใจ ซื้อ หรือ ข้าม (หากเงินไม่พอ ให้ผ่านอัตโนมัติ ไม่ค้าง)
+          if (player.money >= tile.price) {
+            addLog(`🏙️ คุณตกที่ดินว่าง: ${tile.name} (ราคา ฿${tile.price.toLocaleString()})`)
+            return // รอผู้เล่นตัดสินใจ ซื้อ หรือ ข้าม
+          } else {
+            addLog(`🏙️ คุณตกที่ดินว่าง "${tile.name}" (ราคา ฿${tile.price.toLocaleString()}) แต่มียอดเงินไม่เพียงพอ จึงผ่านสิทธิ์การซื้อ`)
+            endPlayerTurnOrDouble(doubleFlag, 1000)
+            return
+          }
         }
       } else {
         // ตาของบอท AI
@@ -1295,6 +1374,7 @@ function Game({ setCurrentPage }) {
     setDebtCrisis(null)
     setBankruptcyWinner(null)
     setLastDrawnCard(null)
+    setInspectingTile(null)
     setDice1(1)
     setDice2(1)
     setIsRolling(false)
@@ -1468,34 +1548,70 @@ function Game({ setCurrentPage }) {
           </span>
         </div>
 
-        {/* แถบสถานะ คุณ vs บอท */}
-        <div className="flex items-center gap-2 sm:gap-3 text-xs">
+        {/* แถบสถานะ คุณ vs บอท (ขยายขนาดตัวอักษรและกล่องเงินให้เด่นชัดขึ้นตามคำขอ) */}
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* สถานะผู้เล่น */}
           <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border transition-all ${
               turn === 'player'
-                ? 'bg-red-50 text-red-800 border-red-300 ring-2 ring-red-400/50'
-                : 'bg-gray-50 text-gray-600 border-gray-200 opacity-80'
+                ? 'bg-red-50 text-red-950 border-red-300 ring-2 ring-red-400/60 shadow-xs'
+                : 'bg-gray-50 text-gray-700 border-gray-200 opacity-80'
             }`}
           >
-            <UserRound className="w-3.5 h-3.5 text-red-600 shrink-0" />
-            <span>คุณ: ฿{player.money.toLocaleString()}</span>
-            <span className="text-[10px] text-red-600">({player.owned.length} เมือง)</span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+              <UserRound className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.5]" />
+            </div>
+            <div className="leading-tight">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-gray-600">คุณ</span>
+                {turn === 'player' && (
+                  <span className="text-[9px] px-1.5 py-0.2 bg-red-600 text-white font-black rounded-full animate-pulse">
+                    ตาของคุณ
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-sm sm:text-base font-black font-mono text-red-600">
+                  ฿{player.money.toLocaleString()}
+                </span>
+                <span className="text-[10px] font-semibold text-gray-500">
+                  ({player.owned.length} เมือง)
+                </span>
+              </div>
+            </div>
           </div>
 
-          <span className="text-xs font-black text-gray-400">VS</span>
+          <span className="text-xs sm:text-sm font-black text-gray-400">VS</span>
 
           {/* สถานะบอท */}
           <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border transition-all ${
               turn === 'bot'
-                ? 'bg-blue-50 text-blue-800 border-blue-300 ring-2 ring-blue-400/50'
-                : 'bg-gray-50 text-gray-600 border-gray-200 opacity-80'
+                ? 'bg-blue-50 text-blue-950 border-blue-300 ring-2 ring-blue-400/60 shadow-xs'
+                : 'bg-gray-50 text-gray-700 border-gray-200 opacity-80'
             }`}
           >
-            <Bot className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>บอท: ฿{bot.money.toLocaleString()}</span>
-            <span className="text-[10px] text-blue-600">({bot.owned.length} เมือง)</span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+              <Bot className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.5]" />
+            </div>
+            <div className="leading-tight">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-gray-600">บอท AI</span>
+                {turn === 'bot' && (
+                  <span className="text-[9px] px-1.5 py-0.2 bg-blue-600 text-white font-black rounded-full animate-pulse">
+                    ตากำลังเดิน...
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-sm sm:text-base font-black font-mono text-blue-600">
+                  ฿{bot.money.toLocaleString()}
+                </span>
+                <span className="text-[10px] font-semibold text-gray-500">
+                  ({bot.owned.length} เมือง)
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1581,9 +1697,11 @@ function Game({ setCurrentPage }) {
               return (
                 <div
                   key={tile.id}
+                  onClick={() => setInspectingTile(tile)}
+                  title={`คลิกเพื่อดูรายละเอียดและค่าเช่า: ${tile.name}`}
                   className={`${tile.gridPos} ${
                     isCorner ? 'bg-amber-100' : 'bg-amber-50'
-                  } rounded-xs sm:rounded-sm p-0.5 flex flex-col justify-between border transition-all duration-200 relative overflow-hidden select-none ${
+                  } rounded-xs sm:rounded-sm p-0.5 flex flex-col justify-between border transition-all duration-200 relative overflow-hidden select-none cursor-pointer hover:ring-2 hover:ring-amber-400 hover:scale-[1.04] active:scale-95 z-10 ${
                     isHoveredFromDeed
                       ? 'border-yellow-400 ring-4 ring-yellow-400 scale-105 z-30 shadow-xl'
                       : isPlayerHere || isBotHere
@@ -1610,7 +1728,7 @@ function Game({ setCurrentPage }) {
                     </div>
                   )}
 
-                  {/* เนื้อหาช่อง */}
+                  {/* เนื้อหาช่อง: แสดงชื่อ และเงินอย่างชัดเจนตามคำขอ (ในแมพแสดงแค่เงินก็ได้) */}
                   <div className="flex-1 flex flex-col items-center justify-center text-center px-0.5">
                     {Icon && (
                       <div className="text-slate-700 shrink-0">
@@ -1620,11 +1738,25 @@ function Game({ setCurrentPage }) {
                     <p className="text-[7.5px] sm:text-[8.5px] font-bold text-gray-800 leading-tight line-clamp-2">
                       {tile.name}
                     </p>
-                    {tile.price > 0 && (
-                      <p className="text-[6.5px] sm:text-[7.5px] text-emerald-700 font-bold leading-none mt-0.5 font-mono">
-                        ฿{tile.price >= 1000 ? `${tile.price / 1000}k` : tile.price}
+
+                    {/* แสดงเงินชัดเจน: หากมีเจ้าของแสดง ค่าเช่า ถ้ายังไม่มีแสดง ราคาซื้อ */}
+                    {isBotOwned ? (
+                      <p className="text-[6.5px] sm:text-[7.5px] text-rose-600 font-black leading-none mt-0.5 font-mono">
+                        ฿{getTileRent(tile.id).toLocaleString()}
                       </p>
-                    )}
+                    ) : isPlayerOwned ? (
+                      <p className="text-[6.5px] sm:text-[7.5px] text-emerald-700 font-black leading-none mt-0.5 font-mono">
+                        ฿{getTileRent(tile.id).toLocaleString()}
+                      </p>
+                    ) : tile.price > 0 ? (
+                      <p className="text-[6.5px] sm:text-[7.5px] text-emerald-700 font-bold leading-none mt-0.5 font-mono">
+                        ฿{tile.price.toLocaleString()}
+                      </p>
+                    ) : tile.id === 0 ? (
+                      <p className="text-[6px] sm:text-[7px] text-emerald-600 font-bold leading-none mt-0.5 font-mono">
+                        +฿2,000
+                      </p>
+                    ) : null}
                   </div>
 
                   {/* ตัวเดินของผู้เล่นและบอทบนช่อง */}
@@ -2109,6 +2241,194 @@ function Game({ setCurrentPage }) {
           className={mobileView === 'bot' ? 'flex' : 'hidden lg:flex'}
         />
       </div>
+
+      {/* ================= MODAL: ตรวจสอบข้อมูลเมือง / ค่าเช่าเมื่อกดคลิกที่ช่อง ================= */}
+      {inspectingTile && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => setInspectingTile(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border-2 border-amber-300 relative text-gray-800 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ปุ่มปิด */}
+            <button
+              onClick={() => setInspectingTile(null)}
+              className="absolute top-4 right-4 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-800 flex items-center justify-center transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* ส่วนหัวชื่อเมืองและสีกลุ่ม */}
+            <div className="flex items-center gap-2 mb-3">
+              {inspectingTile.color ? (
+                <div className={`w-4 h-9 rounded-md ${inspectingTile.color} shrink-0`} />
+              ) : inspectingTile.icon ? (
+                <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                  <inspectingTile.icon className="w-5 h-5" />
+                </div>
+              ) : null}
+              <div>
+                <h3 className="text-lg sm:text-xl font-black text-gray-900 leading-tight">
+                  {inspectingTile.name}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {inspectingTile.group ? `กลุ่มสี${inspectingTile.group}` : inspectingTile.type === 'start' ? 'จุดเริ่มต้น' : inspectingTile.type === 'tax' ? 'ภาษี' : inspectingTile.type === 'jail' ? 'เรือนจำ' : inspectingTile.type === 'chance' ? 'การ์ดโอกาส' : 'ช่องพิเศษ'} (ช่องที่ #{inspectingTile.id})
+                </p>
+              </div>
+            </div>
+
+            {/* สถานะความเป็นเจ้าของ & ข้อมูลสำคัญ */}
+            {bot.owned.includes(inspectingTile.id) ? (
+              // บอทเป็นเจ้าของ: แสดงว่าถ้าเราตกเมืองนี้จะเสียกี่บาท! (ตามที่ผู้ใช้ขอ)
+              <div className="space-y-3">
+                <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl text-center">
+                  <span className="inline-flex items-center gap-1 text-xs font-black text-rose-700 bg-rose-100 px-2.5 py-0.5 rounded-full mb-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>บอท AI เป็นเจ้าของที่ดินนี้</span>
+                  </span>
+                  <p className="text-xs text-rose-800 font-semibold mb-1">
+                    ถ้าคุณเดินมาตกที่ช่องนี้ จะต้องจ่ายค่าเช่า:
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-rose-600 font-mono">
+                    ฿{getTileRent(inspectingTile.id).toLocaleString()}
+                  </p>
+                  <p className="text-[11px] text-rose-500 mt-1">
+                    (ระดับสิ่งปลูกสร้าง: ขั้น {propertyLevels[inspectingTile.id] || 1} / 3)
+                  </p>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs space-y-1.5 text-gray-700">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">ราคาซื้อเริ่มต้น:</span>
+                    <span className="font-mono font-bold">฿{inspectingTile.price.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">ราคาซื้อต่อ (เทคโอเวอร์):</span>
+                    <span className="font-mono font-black text-indigo-700">
+                      ฿{Math.floor(inspectingTile.price * 1.5 + ((propertyLevels[inspectingTile.id] || 1) === 2 ? 700 : (propertyLevels[inspectingTile.id] || 1) === 3 ? 2000 : 0)).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : player.owned.includes(inspectingTile.id) ? (
+              // ผู้เล่นเป็นเจ้าของ
+              <div className="space-y-3">
+                <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center">
+                  <span className="inline-flex items-center gap-1 text-xs font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full mb-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>คุณเป็นเจ้าของที่ดินนี้</span>
+                  </span>
+                  <p className="text-xs text-emerald-800 font-semibold mb-1">
+                    หากบอท AI เดินมาตก คุณจะได้รับค่าเช่า:
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-emerald-600 font-mono">
+                    ฿{getTileRent(inspectingTile.id).toLocaleString()}
+                  </p>
+                  <p className="text-[11px] text-emerald-600 mt-1">
+                    (ระดับสิ่งปลูกสร้าง: ขั้น {propertyLevels[inspectingTile.id] || 1} / 3)
+                  </p>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs space-y-1.5 text-gray-700">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">ราคาซื้อเดิม:</span>
+                    <span className="font-mono font-bold">฿{inspectingTile.price.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">ราคาขายคืนธนาคาร:</span>
+                    <span className="font-mono font-black text-amber-700">
+                      ฿{getTileSellPrice(inspectingTile.id).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : ['property', 'transport', 'utility'].includes(inspectingTile.type) ? (
+              // ที่ดินว่าง ยังไม่มีใครครอบครอง
+              <div className="space-y-3">
+                <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl text-center">
+                  <span className="inline-flex items-center gap-1 text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full mb-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                    <span>ที่ดินว่าง (ยังไม่มีใครซื้อ)</span>
+                  </span>
+                  <p className="text-xs text-amber-900 font-semibold mb-1">
+                    ราคาซื้อที่ดิน:
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-amber-700 font-mono">
+                    ฿{inspectingTile.price.toLocaleString()}
+                  </p>
+                  <p className="text-[11px] text-amber-700 mt-1">
+                    ค่าเช่าเริ่มต้นขั้น 1: ฿{inspectingTile.rent.toLocaleString()}
+                  </p>
+                </div>
+
+                <p className="text-xs text-gray-500 text-center">
+                  เดินมาตกช่องนี้เพื่อรับสิทธิ์ซื้อที่ดินแปลงนี้เป็นคนแรก
+                </p>
+              </div>
+            ) : inspectingTile.type === 'tax' ? (
+              // ช่องภาษี
+              <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl text-center">
+                <span className="text-xs font-black text-rose-700 bg-rose-100 px-2.5 py-0.5 rounded-full inline-block mb-1.5">
+                  ภาษีรายได้ / ฟุ่มเฟือย
+                </span>
+                <p className="text-xs text-rose-800 font-semibold mb-1">
+                  หากเดินมาตก จะต้องจ่ายภาษีให้ธนาคาร:
+                </p>
+                <p className="text-2xl font-black text-rose-600 font-mono">
+                  ฿{inspectingTile.price.toLocaleString()}
+                </p>
+              </div>
+            ) : inspectingTile.type === 'start' ? (
+              // จุดเริ่มต้น
+              <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center">
+                <span className="text-xs font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full inline-block mb-1.5">
+                  จุดเริ่มต้น (START)
+                </span>
+                <p className="text-xs text-emerald-800 font-semibold mb-1">
+                  เมื่อเดินผ่านหรือตกที่ช่องนี้ จะได้รับเงิน:
+                </p>
+                <p className="text-2xl font-black text-emerald-600 font-mono">
+                  +฿2,000
+                </p>
+              </div>
+            ) : inspectingTile.type === 'gotojail' ? (
+              // ไปเรือนจำ
+              <div className="p-4 bg-slate-100 border-2 border-slate-400 rounded-2xl text-center">
+                <span className="text-xs font-black text-slate-800 bg-slate-200 px-2.5 py-0.5 rounded-full inline-block mb-1.5">
+                  ช่องตำรวจจับ (ส่งไปเรือนจำ)
+                </span>
+                <p className="text-xs text-slate-600 mt-1">
+                  หากตกช่องนี้ จะถูกส่งตัวไปยังช่องเรือนจำทันที
+                </p>
+              </div>
+            ) : (
+              // การ์ดโอกาส / เกาะพักผ่อน
+              <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl text-center">
+                <span className="text-xs font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full inline-block mb-1.5">
+                  {inspectingTile.name}
+                </span>
+                <p className="text-xs text-gray-600 mt-1">
+                  {inspectingTile.type === 'chance'
+                    ? 'จั่วการ์ดโอกาสเพื่อลุ้นรับโบนัสพิเศษหรือจ่ายค่าซ่อมแซม'
+                    : inspectingTile.type === 'rest'
+                    ? 'เกาะพักผ่อน จอดพักผ่อนชิลๆ โดยไม่ต้องเสียค่าใช้จ่าย'
+                    : 'ช่องพิเศษประจำกระดาน'}
+                </p>
+              </div>
+            )}
+
+            {/* ปุ่มปิด */}
+            <button
+              onClick={() => setInspectingTile(null)}
+              className="mt-4 w-full py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer"
+            >
+              ปิดหน้าต่าง
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
