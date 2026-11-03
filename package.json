@@ -3,6 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n \"FRONTEND,BACKEND\" -c \"cyan,green\" \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
     "frontend": "npm --prefix frontend run dev",
     "backend": "npm --prefix backend run dev",
     "install-all": "npm install && npm --prefix frontend install && npm --prefix backend install"
