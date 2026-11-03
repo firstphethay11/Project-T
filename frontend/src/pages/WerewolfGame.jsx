@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Moon,
   Sun,
@@ -31,6 +31,8 @@ import {
   Gavel,
   MessageSquare,
   Send,
+  Clock,
+  Timer,
 } from 'lucide-react'
 
 // รายชื่อและข้อมูลความสามารถของทั้ง 9 บทบาท
@@ -233,10 +235,12 @@ function WerewolfGame({ setCurrentPage }) {
   const [witchPotions, setWitchPotions] = useState({ healUsed: false, poisonUsed: false })
   const [witchActionType, setWitchActionType] = useState(null) // 'heal' | 'poison' | null
 
-  // ================= สถานะการโหวตตอนกลางวัน =================
+  // ================= สถานะการโหวต & จับเวลาตอนกลางวัน 1 นาที (60s) =================
   const [hasVotedToday, setHasVotedToday] = useState(false)
   const [voteTally, setVoteTally] = useState({})
   const [executionResult, setExecutionResult] = useState(null)
+  const [dayTimer, setDayTimer] = useState(60) // นับถอยหลัง 1 นาที (60 วินาที)
+  const [isTimerRunning, setIsTimerRunning] = useState(false)
 
   // ================= ระบบสนทนา & ถกเถียงยามเช้าของบอท =================
   const [dayTab, setDayTab] = useState('roster') // 'roster' | 'chat'
@@ -752,7 +756,7 @@ function WerewolfGame({ setCurrentPage }) {
     const updatedRoster = roster.map((p) => (deadIds.includes(p.id) ? { ...p, isAlive: false } : p))
     setRoster(updatedRoster)
 
-    // สลับเป็นกลางวัน และรีเซ็ตการโหวตประจำวัน
+    // สลับเป็นกลางวัน และรีเซ็ตการโหวตประจำวัน พร้อมเริ่มนับเวลา 1 นาที (60 วินาที)
     setGameCycle('day')
     setSelectedTargetId(null)
     setSeerInspectionResult(null)
@@ -760,6 +764,8 @@ function WerewolfGame({ setCurrentPage }) {
     setWitchActionType(null)
     setHasVotedToday(false)
     setVoteTally({})
+    setDayTimer(60)
+    setIsTimerRunning(true)
 
     // ข้อมูลสรุปยามเช้า (Morning Report)
     const deadPlayers = roster.filter((p) => deadIds.includes(p.id))
@@ -771,10 +777,10 @@ function WerewolfGame({ setCurrentPage }) {
     setMorningReport(reportData)
 
     if (deadIds.length === 0) {
-      addLog(`☀️ รุ่งอรุณวันที่ ${roundNumber}: พ้นคืนแรกแล้ว! เมื่อคืนไม่มีใครเสียชีวิต ทุกคนปลอดภัย`)
+      addLog(`☀️ รุ่งอรุณวันที่ ${roundNumber}: จบคืนที่เกิดแอ็กชันแล้ว! ทุกคนปลอดภัยดี การโหวตประหารเปิดฉากขึ้น (เวลา 1 นาที)`)
     } else {
       const deadNames = deadPlayers.map((d) => d.name).join(', ')
-      addLog(`☀️ รุ่งอรุณวันที่ ${roundNumber}: พ้นคืนแรกแล้ว! พบศพผู้เสียชีวิต: ${deadNames}`)
+      addLog(`☀️ รุ่งอรุณวันที่ ${roundNumber}: จบคืนที่เกิดแอ็กชันแล้ว! พบศพ: ${deadNames} เริ่มการโหวตประหาร (เวลา 1 นาที)`)
     }
 
     // สร้างบทสนทนาและความคิดของบอทยามเช้า (Bot Morning Discussions)
@@ -788,6 +794,8 @@ function WerewolfGame({ setCurrentPage }) {
   // ================= 3. ระบบโหวตประหารในตอนกลางวัน =================
   const handleCastVoteAndExecute = () => {
     if (hasVotedToday) return
+
+    setIsTimerRunning(false)
 
     const livingPlayers = roster.filter((p) => p.isAlive)
     if (livingPlayers.length <= 1) return
@@ -906,9 +914,58 @@ function WerewolfGame({ setCurrentPage }) {
     checkWinCondition(updatedRoster)
   }
 
+  // นับถอยหลังเวลาตอนเช้า 1 นาที (60 วินาที) สำหรับการอภิปรายและโหวตประหาร
+  useEffect(() => {
+    if (phase !== 'playing' || gameCycle !== 'day' || hasVotedToday || !isTimerRunning) return
+
+    if (dayTimer <= 0) {
+      addLog(`⏰ หมดเวลาตอนเช้า 1 นาที (60 วินาที)! ศาลหมู่บ้านทำการปิดหีบและนับคะแนนโหวตประหารทันที`)
+      handleCastVoteAndExecute()
+      return
+    }
+
+    const timer = setInterval(() => {
+      setDayTimer((prev) => {
+        const next = prev - 1
+
+        // ข้อความประกาศแจ้งเตือนสถานการณ์ในห้องแชทตามช่วงเวลา
+        if (next === 30) {
+          setMorningMessages((msgs) => [
+            ...msgs,
+            {
+              id: `sys-time-30-${Date.now()}`,
+              senderId: -1,
+              senderName: '⏳ ศาลกลางเมือง',
+              isSystem: true,
+              text: 'เหลือเวลาอภิปรายอีก 30 วินาที! ชาวบ้านทุกคนเริ่มตัดสินใจและลงคะแนนโหวตได้แล้ว 🗳️',
+              time: `เช้า วันที่ ${roundNumber}`,
+            },
+          ])
+        } else if (next === 10) {
+          setMorningMessages((msgs) => [
+            ...msgs,
+            {
+              id: `sys-time-10-${Date.now()}`,
+              senderId: -1,
+              senderName: '⚠️ ศาลกลางเมือง',
+              isSystem: true,
+              text: 'เหลือเวลา 10 วินาทีสุดท้าย! ระบบจะปิดหีบและนับคะแนนโหวตทันทีเมื่อเวลาหมด!',
+              time: `เช้า วันที่ ${roundNumber}`,
+            },
+          ])
+        }
+
+        return next
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [phase, gameCycle, hasVotedToday, isTimerRunning, dayTimer, roundNumber])
+
   // ข้ามการโหวตวันนี้
   const handleSkipVote = () => {
     setHasVotedToday(true)
+    setIsTimerRunning(false)
     addLog(`🕊️ หมู่บ้านตัดสินใจยกเว้นการโหวตประหารในวันนี้`)
   }
 
@@ -925,6 +982,8 @@ function WerewolfGame({ setCurrentPage }) {
     setWitchActionType(null)
     setHasVotedToday(false)
     setVoteTally({})
+    setIsTimerRunning(false)
+    setDayTimer(60)
     addLog(`🌙 คืนที่ ${roundNumber + 1}: ราตรีมืดมิดกลับมาอีกครั้ง ทุกคนในหมู่บ้านหลับตาลง...`)
   }
 
@@ -939,6 +998,8 @@ function WerewolfGame({ setCurrentPage }) {
     setBotThoughts({})
     setUserChatInput('')
     setDayTab('roster')
+    setIsTimerRunning(false)
+    setDayTimer(60)
   }
 
   return (
@@ -1040,10 +1101,10 @@ function WerewolfGame({ setCurrentPage }) {
             </div>
 
             <h3 className="text-2xl font-black text-white mb-1">
-              ☀️ รุ่งอรุณวันที่ {morningReport.round} (พ้นคืนแรกแล้ว!)
+              ☀️ รุ่งอรุณวันที่ {morningReport.round} (จบคืนที่เกิดแอ็กชันแล้ว)
             </h3>
             <p className="text-xs text-amber-200/80 mb-3">
-              ทุกคนตื่นขึ้นมารวมตัวกันที่ลานกลางเมืองเพื่อเริ่มการโหวตประหาร
+              ทุกคนตื่นขึ้นมารวมตัวกันที่ลานกลางเมืองเพื่อเริ่มการโหวตประหาร (มีเวลา 1 นาที)
             </p>
 
             {morningReport.isPeaceful ? (
@@ -1068,11 +1129,14 @@ function WerewolfGame({ setCurrentPage }) {
             )}
 
             <button
-              onClick={() => setMorningReport(null)}
-              className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-slate-950 font-black text-sm rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+              onClick={() => {
+                setMorningReport(null)
+                setIsTimerRunning(true)
+              }}
+              className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-slate-950 font-black text-sm rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2 ring-2 ring-amber-300/60"
             >
               <Gavel className="w-4 h-4" />
-              <span>เข้าสู่ลานประชุม & เริ่มโหวตประหารผู้ต้องสงสัย →</span>
+              <span>เข้าสู่ลานประชุม & เริ่มโหวตประหาร (เวลา 1 นาที) →</span>
             </button>
           </div>
         </div>
@@ -1187,10 +1251,20 @@ function WerewolfGame({ setCurrentPage }) {
             >
               {phase === 'playing'
                 ? gameCycle === 'night'
-                  ? `🌙 ค่ำคืนที่ ${roundNumber} (ราตรีมืดมิด)`
-                  : `☀️ กลางวันวันที่ ${roundNumber} (เปิดโหวตประหาร)`
+                  ? `🌙 ค่ำคืนที่ ${roundNumber} (ช่วงทำแอ็กชัน)`
+                  : `☀️ กลางวันวันที่ ${roundNumber} (เปิดโหวต 1 นาที)`
                 : `ห้อง ${currentTotalAssigned} คน`}
             </span>
+
+            {/* แสดงเวลานับถอยหลัง 1 นาทีบนหัวบาร์ตอนกลางวัน */}
+            {phase === 'playing' && gameCycle === 'day' && !hasVotedToday && (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-black/60 border border-amber-500/40 rounded-lg text-xs font-mono font-black">
+                <Clock className={`w-3 h-3 ${dayTimer <= 10 ? 'text-rose-400 animate-spin' : 'text-amber-400'}`} />
+                <span className={dayTimer <= 10 ? 'text-rose-400 animate-pulse' : dayTimer <= 20 ? 'text-amber-300' : 'text-emerald-400'}>
+                  00:{dayTimer < 10 ? `0${dayTimer}` : dayTimer}
+                </span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -1460,10 +1534,19 @@ function WerewolfGame({ setCurrentPage }) {
                 {/* สรุปค่ำคืน เข้าสู่เช้าวันถัดไป */}
                 <button
                   onClick={handleResolveNightToDay}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                  disabled={isUserNightActor && !hasActedTonight}
+                  className={`px-4 py-2 font-black text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer ${
+                    isUserNightActor && !hasActedTonight
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700 opacity-70'
+                      : 'bg-amber-500 hover:bg-amber-600 text-slate-950 hover:shadow-amber-500/30 ring-2 ring-amber-400/50'
+                  }`}
                 >
                   <Sun className="w-4 h-4" />
-                  <span>พ้นคืนแรก & เข้าสู่รุ่งเช้า (เปิดโหวต) ☀️</span>
+                  <span>
+                    {isUserNightActor && !hasActedTonight
+                      ? 'กรุณาทำแอ็กชันคืนนี้ก่อน ⏳'
+                      : `จบคืนที่ ${roundNumber} & เข้าสู่เช้า (เริ่มโหวต 1 นาที) ☀️`}
+                  </span>
                 </button>
               </div>
             </div>
@@ -1471,62 +1554,102 @@ function WerewolfGame({ setCurrentPage }) {
 
           {/* แผงควบคุมการโหวตตอนกลางวัน (Daytime Voting Center) */}
           {gameCycle === 'day' && (
-            <div className="bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border-2 border-amber-600/50 rounded-2xl p-3 shadow-xl shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-amber-500/20 text-yellow-400 border border-amber-500/40">
-                  <Vote className="w-6 h-6 animate-pulse" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      พ้นคืนแรกแล้ว! ลานประหารหมู่บ้าน
-                    </span>
-                    <span className="text-xs text-slate-400 font-semibold">
-                      (วันที่ {roundNumber})
-                    </span>
+            <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-2 border-amber-600/50 rounded-2xl p-3 shadow-xl shrink-0 flex flex-col gap-2.5 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-amber-500/20 text-yellow-400 border border-amber-500/40">
+                    <Vote className="w-6 h-6 animate-pulse" />
                   </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        จบคืนที่เกิดแอ็กชันแล้ว! ลานประหารหมู่บ้าน
+                      </span>
+                      <span className="text-xs text-slate-400 font-semibold">
+                        (วันที่ {roundNumber})
+                      </span>
+                    </div>
 
-                  <p className="text-xs sm:text-sm font-bold text-white mt-0.5">
-                    {!hasVotedToday
-                      ? 'คลิกเลือกการ์ดผู้เล่นที่ต้องสงสัยเพื่อลงคะแนนโหวตประหาร 🗳️'
-                      : 'การโหวตประจำวันเสร็จสิ้นแล้ว สามารถเข้าสู่ค่ำคืนถัดไปได้'}
-                  </p>
+                    <p className="text-xs sm:text-sm font-bold text-white mt-0.5">
+                      {!hasVotedToday
+                        ? 'การโหวตเริ่มต้นแล้ว! คลิกเลือกผู้เล่นที่ต้องสงสัยเพื่อลงคะแนนโหวตประหาร 🗳️'
+                        : 'การโหวตประจำวันเสร็จสิ้นแล้ว สามารถเข้าสู่ค่ำคืนถัดไปได้'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* กล่องจับเวลานับถอยหลัง 1 นาที & ปุ่มลงคะแนน */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {!hasVotedToday && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/70 border border-amber-500/50 rounded-xl shadow-inner">
+                      <Clock className={`w-4 h-4 ${dayTimer <= 10 ? 'text-rose-400 animate-spin' : 'text-amber-400'}`} />
+                      <div className="text-left leading-none">
+                        <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                          เวลาโหวต (1 นาที)
+                        </div>
+                        <div
+                          className={`text-sm font-mono font-black ${
+                            dayTimer <= 10
+                              ? 'text-rose-400 animate-pulse'
+                              : dayTimer <= 20
+                              ? 'text-amber-300'
+                              : 'text-emerald-400'
+                          }`}
+                        >
+                          00:{dayTimer < 10 ? `0${dayTimer}` : dayTimer}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!hasVotedToday ? (
+                    <>
+                      <button
+                        onClick={handleCastVoteAndExecute}
+                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer transform active:scale-95"
+                      >
+                        <Gavel className="w-4 h-4" />
+                        <span>
+                          {selectedTargetId !== null
+                            ? `โหวตประหาร "${roster.find((p) => p.id === selectedTargetId)?.name}"`
+                            : 'ยืนยันการโหวตของหมู่บ้าน 🗳️'}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={handleSkipVote}
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
+                      >
+                        🕊️ ข้ามการโหวตวันนี้
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleStartNextNight}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Moon className="w-4 h-4" />
+                      <span>จบการประชุม เข้าสู่คืนถัดไป 🌙</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* ปุ่มลงคะแนนโหวต & ข้าม */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {!hasVotedToday ? (
-                  <>
-                    <button
-                      onClick={handleCastVoteAndExecute}
-                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer transform active:scale-95"
-                    >
-                      <Gavel className="w-4 h-4" />
-                      <span>
-                        {selectedTargetId !== null
-                          ? `โหวตประหาร "${roster.find((p) => p.id === selectedTargetId)?.name}"`
-                          : 'ยืนยันการโหวตของหมู่บ้าน 🗳️'}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={handleSkipVote}
-                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
-                    >
-                      🕊️ ข้ามการโหวตวันนี้
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={handleStartNextNight}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Moon className="w-4 h-4" />
-                    <span>จบการประชุม เข้าสู่คืนถัดไป 🌙</span>
-                  </button>
-                )}
-              </div>
+              {/* แถบหลอดเวลา (Progress Bar) สำหรับ 1 นาที */}
+              {!hasVotedToday && (
+                <div className="w-full bg-slate-950/90 rounded-full h-1.5 overflow-hidden border border-white/10">
+                  <div
+                    className={`h-full transition-all duration-1000 ${
+                      dayTimer <= 10
+                        ? 'bg-gradient-to-r from-rose-500 to-red-600'
+                        : dayTimer <= 25
+                        ? 'bg-gradient-to-r from-amber-400 to-yellow-500'
+                        : 'bg-gradient-to-r from-emerald-400 to-green-500'
+                    }`}
+                    style={{ width: `${(dayTimer / 60) * 100}%` }}
+                  />
+                </div>
+              )}
             </div>
           )}
 
