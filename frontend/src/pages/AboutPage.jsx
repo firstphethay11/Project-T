@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { UserRound, Plus, X, Trash2, PartyPopper } from 'lucide-react'
+import { UserRound, Plus, X, Trash2 } from 'lucide-react'
+import Toast from '../components/Toast'
 
 function AboutPage() {
   // สถานะเก็บรายชื่อสมาชิก (เริ่มต้นไม่มีกล่อง)
@@ -63,22 +64,8 @@ function AboutPage() {
 
   return (
     <div className="space-y-6 relative">
-      {/* ป๊อปอัปแจ้งเตือนข้อความเด้งขึ้นมา: ยินดีต้อนรับ */}
-      {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-blue-600 text-white px-5 py-3.5 rounded-xl shadow-xl transition-all duration-300">
-          <PartyPopper className="w-6 h-6 text-yellow-300 shrink-0" />
-          <div>
-            <p className="font-bold text-sm">ยินดีต้อนรับ!</p>
-            <p className="text-xs text-blue-100">{toastMessage}</p>
-          </div>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="ml-2 text-blue-200 hover:text-white transition cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      {/* ป๊อปอัปแจ้งเตือนข้อความเด้งขึ้นมา: ยินดีต้อนรับ (ดึงจาก Component) */}
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
 
       {/* ส่วนหัว และ ปุ่มเพิ่มกล่อง */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 pb-4">
