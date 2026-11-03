@@ -6,6 +6,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  Gamepad2,
 } from 'lucide-react'
 
 function Aside({ currentPage, setCurrentPage }) {
@@ -15,6 +16,7 @@ function Aside({ currentPage, setCurrentPage }) {
   const menuItems = [
     { id: 'home', label: 'หน้าแรก (Home)', icon: Home },
     { id: 'about', label: 'สมาชิกในทีม (About)', icon: Users },
+    { id: 'game', label: 'เกมเศรษฐี (Game)', icon: Gamepad2 },
   ]
 
   return (
@@ -94,4 +96,3 @@ function Aside({ currentPage, setCurrentPage }) {
 }
 
 export default Aside
-
