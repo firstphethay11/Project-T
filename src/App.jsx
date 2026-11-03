@@ -22,6 +22,13 @@ function App() {
           <p className="text-gray-700">ชื่อ: [ใส่ชื่อของเพื่อน]</p>
           <p className="text-gray-500 mt-1">ข้อความทักทาย: ยินดีที่ได้ร่วมงาน!</p>
         </section>
+
+        <section className="p-6 border border-gray-300 rounded-xl shadow-sm bg-white">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">สมาชิกคนที่ 3</h2>
+          <p className="text-gray-700">ชื่อ: [ใส่ชื่อของเพื่อน]</p>
+          <p className="text-gray-500 mt-1">ข้อความทักทาย: ยินดีที่ได้ร่วมงาน!</p>
+        </section>
+        
       </main>
 
       <footer className="mt-12 text-center text-gray-400 text-sm">
