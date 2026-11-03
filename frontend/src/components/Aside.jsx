@@ -19,7 +19,7 @@ function Aside({ currentPage, setCurrentPage }) {
 
   return (
     <aside
-      className={`bg-white border-r border-gray-200 flex flex-col justify-between transition-all duration-300 shrink-0 ${
+      className={`sticky top-16 h-[calc(100vh-4rem)] bg-white border-r border-gray-200 flex flex-col justify-between transition-all duration-300 shrink-0 overflow-y-auto ${
         isCollapsed ? 'w-20' : 'w-64'
       }`}
     >
@@ -77,7 +77,7 @@ function Aside({ currentPage, setCurrentPage }) {
         </nav>
       </div>
 
-      {/* ส่วนล่างของ Aside */}
+      {/* ส่วนล่างของ Aside (ติดขอบล่างของหน้าจอพอดี) */}
       <div className="p-4 border-t border-gray-100">
         <button
           title={isCollapsed ? 'ตั้งค่า (Settings)' : ''}
@@ -94,4 +94,3 @@ function Aside({ currentPage, setCurrentPage }) {
 }
 
 export default Aside
-

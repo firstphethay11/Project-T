@@ -2,8 +2,8 @@ import { GitBranch, Sparkles, BookOpen, ExternalLink } from 'lucide-react'
 
 function Navbar({ currentPage, setCurrentPage }) {
   return (
-    <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-gray-200/80 shadow-xs">
-      <div className="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
+    <header className="sticky top-0 z-40 h-16 bg-white/85 backdrop-blur-md border-b border-gray-200/80 shadow-xs flex items-center">
+      <div className="max-w-7xl w-full mx-auto px-6 flex items-center justify-between">
         {/* โลโก้ + ชื่อโปรเจกต์ (คลิกเพื่อกลับหน้าแรกได้) */}
         <div
           onClick={() => setCurrentPage('home')}
