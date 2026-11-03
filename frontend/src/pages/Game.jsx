@@ -311,6 +311,8 @@ function AssetsPanel({
   data,
   propertyLevels,
   getTileRent,
+  getTileSellPrice,
+  onSellProperty,
   hoveredTileId,
   setHoveredTileId,
   className = '',
@@ -518,6 +520,21 @@ function AssetsPanel({
                     ค่าเช่า ฿{getTileRent(tile.id).toLocaleString()}
                   </span>
                 </div>
+
+                {/* ปุ่มขายที่ดินทิ้ง (เฉพาะฝั่งผู้เล่น) ที่ดินจะกลับมาว่างเปล่า */}
+                {isPlayer && onSellProperty && getTileSellPrice && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSellProperty(tile.id)
+                    }}
+                    className="mt-1.5 w-full py-1 text-[9.5px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 active:scale-95 border border-rose-200 rounded-md transition flex items-center justify-center gap-1 cursor-pointer"
+                    title="ขายที่ดินคืนธนาคาร (ช่องนี้จะกลับมาว่างเปล่าบนกระดาน)"
+                  >
+                    <Trash2 className="w-3 h-3 text-rose-600" />
+                    <span>ขายที่ดินทิ้ง (รับ ฿{getTileSellPrice(tile.id).toLocaleString()})</span>
+                  </button>
+                )}
               </div>
             ))
           )}
@@ -577,6 +594,170 @@ function Game({ setCurrentPage }) {
   // ข้อมูลช่องที่ดินของตัวเองที่สามารถอัปเกรดได้ในตานี้
   const [canUpgradeTile, setCanUpgradeTile] = useState(null)
 
+  // ข้อมูลช่องที่ดินคู่แข่งที่สามารถซื้อต่อ (เทคโอเวอร์) ได้ในตานี้
+  const [canTakeoverTile, setCanTakeoverTile] = useState(null)
+
+  // ภาวะวิกฤตการเงิน (เงินไม่พอจ่ายค่าเช่า/ภาษี -> ต้องเลือกขายที่ดิน หรือยอมรับการล้มละลาย)
+  const [debtCrisis, setDebtCrisis] = useState(null)
+
+  // ผลการตัดสินผู้ชนะจากการล้มละลาย: 'player' | 'bot' | null
+  const [bankruptcyWinner, setBankruptcyWinner] = useState(null)
+
+  // คำนวณราคาขายที่ดินคืนธนาคาร (ราคาซื้อ + มูลค่าอัปเกรด)
+  const getTileSellPrice = (tileId) => {
+    const tile = INITIAL_TILES[tileId]
+    if (!tile) return 0
+    const lvl = propertyLevels[tileId] || 1
+    let upgradeVal = 0
+    if (lvl === 2) upgradeVal = 700
+    if (lvl >= 3) upgradeVal = 2000
+    return Math.floor(tile.price + upgradeVal)
+  }
+
+  // ขายที่ดินทิ้ง (ทำให้ที่ดินแปลงนั้นกลับมาว่างเปล่าบนกระดาน)
+  const handleSellProperty = (tileId, isBot = false) => {
+    const tile = INITIAL_TILES[tileId]
+    if (!tile) return
+    const sellPrice = getTileSellPrice(tileId)
+
+    if (isBot) {
+      setBot((prev) => ({
+        ...prev,
+        money: prev.money + sellPrice,
+        owned: prev.owned.filter((id) => id !== tileId),
+      }))
+    } else {
+      setPlayer((prev) => ({
+        ...prev,
+        money: prev.money + sellPrice,
+        owned: prev.owned.filter((id) => id !== tileId),
+      }))
+    }
+
+    // รีเซ็ตเลเวลที่ดินและนำออกจากกรรมสิทธิ์ -> ช่องนั้นจะกลับมาว่างเปล่าบนกระดานทันที!
+    setPropertyLevels((prev) => {
+      const updated = { ...prev }
+      delete updated[tileId]
+      return updated
+    })
+
+    addLog(`🏷️ ${isBot ? '🤖 บอท' : 'คุณ'}ขายที่ดิน "${tile.name}" คืนธนาคาร ได้รับเงิน ฿${sellPrice.toLocaleString()} (ที่ดินแปลงนี้กลับมาว่างเปล่าแล้ว)`)
+  }
+
+  // ผู้เล่นชำระหนี้หลังขายที่ดินจนมีเงินเพียงพอ
+  const handleResolvePlayerDebt = () => {
+    if (!debtCrisis || player.money < debtCrisis.amount) return
+    const { creditor, amount, reason, doubleFlag, tile } = debtCrisis
+
+    setPlayer((p) => ({ ...p, money: p.money - amount }))
+    if (creditor === 'bot') {
+      setBot((b) => ({ ...b, money: b.money + amount }))
+    }
+
+    addLog(`✅ คุณชำระ ${reason} จำนวน ฿${amount.toLocaleString()} เรียบร้อยแล้ว (รอดพ้นการล้มละลาย)`)
+    setDebtCrisis(null)
+
+    // หากเป็นการจ่ายค่าเช่าที่ดิน และยังมีเงินเหลือพอซื้อต่อที่ดินบอทได้
+    if (creditor === 'bot' && tile) {
+      const lvl = propertyLevels[tile.id] || 1
+      const takeoverPrice = Math.floor(tile.price * 1.5 + (lvl === 2 ? 700 : lvl === 3 ? 2000 : 0))
+      if (player.money - amount >= takeoverPrice) {
+        setCanTakeoverTile({
+          tile,
+          takeoverPrice,
+          doubleFlag,
+        })
+        return
+      }
+    }
+
+    endPlayerTurnOrDouble(doubleFlag, 1000)
+  }
+
+  // ผู้เล่นยอมรับการล้มละลาย
+  const handlePlayerDeclareBankruptcy = () => {
+    setBankruptcyWinner('bot')
+    addLog('💀 คุณเงินหมดและไม่มีที่ดินเหลือพอจ่ายหนี้ -> ล้มละลาย! บอทเป็นผู้ชนะในเกมนี้')
+    setDebtCrisis(null)
+  }
+
+  // จัดการกรณีบอทเงินไม่พอจ่าย (บอททยอยขายที่ดินทีละแปลงจนพอ หรือล้มละลาย)
+  const handleBotDebtCrisis = (creditor, amount, reason, doubleFlag) => {
+    let currentMoney = bot.money
+    let currentOwned = [...bot.owned]
+
+    while (currentMoney < amount && currentOwned.length > 0) {
+      const tileToSellId = currentOwned[0]
+      const tile = INITIAL_TILES[tileToSellId]
+      const sellPrice = getTileSellPrice(tileToSellId)
+
+      currentMoney += sellPrice
+      currentOwned = currentOwned.filter((id) => id !== tileToSellId)
+
+      setPropertyLevels((prev) => {
+        const updated = { ...prev }
+        delete updated[tileToSellId]
+        return updated
+      })
+
+      addLog(`⚠️ บอทเงินไม่พอจ่าย จึงขายที่ดิน "${tile.name}" ได้เงิน ฿${sellPrice.toLocaleString()} (ที่ดินกลับมาว่างเปล่า)`)
+    }
+
+    if (currentMoney >= amount) {
+      const finalMoney = currentMoney - amount
+      setBot({
+        ...bot,
+        money: finalMoney,
+        owned: currentOwned,
+      })
+      if (creditor === 'player') {
+        setPlayer((p) => ({ ...p, money: p.money + amount }))
+      }
+      addLog(`🤖 บอทจ่าย ${reason} จำนวน ฿${amount.toLocaleString()} สำเร็จ`)
+      return true
+    } else {
+      setBot({
+        ...bot,
+        money: 0,
+        owned: [],
+      })
+      setBankruptcyWinner('player')
+      addLog(`🎉 บอทไม่มีเงินและที่ดินเหลือพอจ่าย ${reason} -> บอทล้มละลายแล้ว! คุณชนะเกมเศรษฐี!`)
+      return false
+    }
+  }
+
+  // ผู้เล่นซื้อต่อที่ดินคู่แข่ง (เทคโอเวอร์)
+  const handlePlayerTakeover = (takeoverInfo) => {
+    const { tile, takeoverPrice, doubleFlag } = takeoverInfo
+    if (player.money < takeoverPrice) {
+      alert('ยอดเงินไม่เพียงพอสำหรับการซื้อต่อที่ดิน!')
+      return
+    }
+
+    setPlayer((p) => ({
+      ...p,
+      money: p.money - takeoverPrice,
+      owned: [...p.owned, tile.id],
+    }))
+    setBot((b) => ({
+      ...b,
+      money: b.money + takeoverPrice,
+      owned: b.owned.filter((id) => id !== tile.id),
+    }))
+
+    addLog(`🏰 คุณทุ่มเงิน ฿${takeoverPrice.toLocaleString()} ซื้อต่อที่ดิน "${tile.name}" จากบอทสำเร็จ!`)
+    setCanTakeoverTile(null)
+    endPlayerTurnOrDouble(doubleFlag, 1000)
+  }
+
+  // ผู้เล่นข้ามไม่ซื้อต่อที่ดิน
+  const handlePlayerSkipTakeover = (takeoverInfo) => {
+    addLog(`คุณเลือกไม่ซื้อต่อที่ดิน "${takeoverInfo.tile.name}"`)
+    setCanTakeoverTile(null)
+    endPlayerTurnOrDouble(takeoverInfo.doubleFlag, 500)
+  }
+
   // คำนวณค่าเช่าตามระดับการอัปเกรด (ขั้น 1: ค่าเช่าปกติ, ขั้น 2: +500, ขั้น 3: +1,500)
   const getTileRent = (tileId, explicitLevel = null) => {
     const tile = INITIAL_TILES[tileId]
@@ -589,6 +770,7 @@ function Game({ setCurrentPage }) {
 
   // จบตาของผู้เล่น หรือให้ทอยต่อหากติดดับเบิ้ล
   const endPlayerTurnOrDouble = (doubleFlag, delay = 1000) => {
+    if (bankruptcyWinner) return
     if (doubleFlag) {
       setTimeout(() => {
         setHasRolled(false)
@@ -603,6 +785,7 @@ function Game({ setCurrentPage }) {
 
   // จบตาของบอท หรือให้บอทเดินต่อหากติดดับเบิ้ล
   const endBotTurn = (doubleFlag, delay = 1000) => {
+    if (bankruptcyWinner) return
     if (doubleFlag) {
       setTimeout(() => {
         botRollAndMove()
@@ -710,23 +893,37 @@ function Game({ setCurrentPage }) {
         setDice2(d2)
         setIsRolling(false)
 
-        const isPair = d1 === d2
-        const botDouble = isPair && Math.random() < 0.5
+        const sum = d1 + d2
+        // ผลรวมเต๋าออกเลขคู่ (2, 4, 6, 8, 10, 12) มีโอกาส 50% ที่จะติดดับเบิ้ล
+        const isEven = sum % 2 === 0
+        const botDouble = isEven && Math.random() < 0.5
         if (botDouble) {
-          addLog(`🤖 บอททอยได้ดับเบิ้ล (${d1} - ${d2})! ได้สิทธิ์เดินต่อ`)
+          addLog(`🤖 บอททอยได้ผลรวมเลขคู่ ${sum} แต้ม (${d1}+${d2})! ติดดับเบิ้ล 50% ได้สิทธิ์เดินต่อ`)
         }
 
-        animateWalking(d1 + d2, 'bot', botDouble)
+        animateWalking(sum, 'bot', botDouble)
       }
     }, 70)
   }
 
   // ================= 3. ผู้เล่นทอยเต๋า =================
   const handlePlayerRoll = () => {
-    if (isRolling || isMoving || turn !== 'player' || hasRolled) return
+    if (
+      isRolling ||
+      isMoving ||
+      turn !== 'player' ||
+      hasRolled ||
+      debtCrisis ||
+      canTakeoverTile ||
+      canUpgradeTile ||
+      bankruptcyWinner
+    )
+      return
+
     setIsRolling(true)
     setHasRolled(true)
     setCanUpgradeTile(null)
+    setCanTakeoverTile(null)
 
     let count = 0
     const interval = setInterval(() => {
@@ -741,20 +938,21 @@ function Game({ setCurrentPage }) {
         setDice2(d2)
         setIsRolling(false)
 
-        // ถ้าทอยได้เลขคู่ (แต้มเท่ากัน) มีโอกาส 50% ที่จะติดดับเบิ้ล
-        const isPair = d1 === d2
-        const doubleSuccess = isPair && Math.random() < 0.5
+        // ถ้าผลรวมเต๋าออกเลขคู่ (2, 4, 6, 8, 10, 12) มีโอกาส 50% ที่จะติดดับเบิ้ล
+        const sum = d1 + d2
+        const isEven = sum % 2 === 0
+        const doubleSuccess = isEven && Math.random() < 0.5
         if (doubleSuccess) {
           setIsDoubleRoll(true)
-          addLog(`🎉 ดับเบิ้ล! แต้มออกคู่ (${d1} - ${d2}) ติดโอกาส 50% คุณได้สิทธิ์ทอยเต๋าอีกครั้ง!`)
+          addLog(`🎉 ดับเบิ้ล! ผลรวมเต๋าออกเลขคู่ ${sum} แต้ม (${d1}+${d2}) ติดโอกาส 50% คุณได้สิทธิ์ทอยเต๋าอีกครั้ง!`)
         } else {
           setIsDoubleRoll(false)
-          if (isPair) {
-            addLog(`🎲 แต้มออกคู่ (${d1} - ${d2}) แต่ไม่ติดโบนัสดับเบิ้ล (โอกาส 50%)`)
+          if (isEven) {
+            addLog(`🎲 ผลรวมเต๋าออกเลขคู่ ${sum} แต้ม (${d1}+${d2}) แต่ไม่ติดโบนัสดับเบิ้ล (โอกาส 50%)`)
           }
         }
 
-        animateWalking(d1 + d2, 'player', doubleSuccess)
+        animateWalking(sum, 'player', doubleSuccess)
       }
     }, 70)
   }
@@ -804,12 +1002,28 @@ function Game({ setCurrentPage }) {
 
     if (tile.type === 'tax') {
       if (isPlayer) {
-        setPlayer((p) => ({ ...p, money: Math.max(0, p.money - tile.price) }))
+        if (player.money < tile.price) {
+          addLog(`⚠️ คุณตกช่องภาษี (${tile.name}) ต้องจ่าย ฿${tile.price.toLocaleString()} แต่มีเงินไม่พอ! เข้าสู่วิกฤตการเงิน`)
+          setDebtCrisis({
+            debtor: 'player',
+            creditor: 'bank',
+            amount: tile.price,
+            reason: `ภาษี (${tile.name})`,
+            doubleFlag,
+          })
+          return
+        }
+        setPlayer((p) => ({ ...p, money: p.money - tile.price }))
         addLog(`💸 คุณเสียภาษี ฿${tile.price.toLocaleString()}`)
         endPlayerTurnOrDouble(doubleFlag, 1000)
       } else {
-        setBot((b) => ({ ...b, money: Math.max(0, b.money - tile.price) }))
-        addLog(`💸 บอทเสียภาษี ฿${tile.price.toLocaleString()}`)
+        if (bot.money < tile.price) {
+          const ok = handleBotDebtCrisis('bank', tile.price, `ภาษี (${tile.name})`, doubleFlag)
+          if (!ok) return
+        } else {
+          setBot((b) => ({ ...b, money: b.money - tile.price }))
+          addLog(`💸 บอทเสียภาษี ฿${tile.price.toLocaleString()}`)
+        }
         endBotTurn(doubleFlag, 1000)
       }
       return
@@ -844,19 +1058,39 @@ function Game({ setCurrentPage }) {
       setLastDrawnCard(drawnInfo)
 
       if (isPlayer) {
-        setPlayer((p) => ({ ...p, money: Math.max(0, p.money + randomCard.amount) }))
-        if (randomCard.amount >= 0) {
-          addLog(`🎴 คุณเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (ได้รับ +฿${randomCard.amount.toLocaleString()})`)
+        if (randomCard.amount < 0) {
+          const penalty = Math.abs(randomCard.amount)
+          if (player.money < penalty) {
+            addLog(`🎴 คุณเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (ต้องจ่าย ฿${penalty.toLocaleString()} แต่เงินไม่พอ!) เข้าสู่วิกฤตการเงิน`)
+            setDebtCrisis({
+              debtor: 'player',
+              creditor: 'bank',
+              amount: penalty,
+              reason: `การ์ดโอกาส: "${randomCard.title}"`,
+              doubleFlag,
+            })
+            return
+          }
+          setPlayer((p) => ({ ...p, money: p.money - penalty }))
+          addLog(`🎴 คุณเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (เสีย ฿${penalty.toLocaleString()})`)
         } else {
-          addLog(`🎴 คุณเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (เสีย ฿${Math.abs(randomCard.amount).toLocaleString()})`)
+          setPlayer((p) => ({ ...p, money: p.money + randomCard.amount }))
+          addLog(`🎴 คุณเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (ได้รับ +฿${randomCard.amount.toLocaleString()})`)
         }
         endPlayerTurnOrDouble(doubleFlag, 1200)
       } else {
-        setBot((b) => ({ ...b, money: Math.max(0, b.money + randomCard.amount) }))
-        if (randomCard.amount >= 0) {
-          addLog(`🎴 บอทเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (ได้ +฿${randomCard.amount.toLocaleString()})`)
+        if (randomCard.amount < 0) {
+          const penalty = Math.abs(randomCard.amount)
+          if (bot.money < penalty) {
+            const ok = handleBotDebtCrisis('bank', penalty, `การ์ดโอกาส: "${randomCard.title}"`, doubleFlag)
+            if (!ok) return
+          } else {
+            setBot((b) => ({ ...b, money: b.money - penalty }))
+            addLog(`🎴 บอทเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (เสีย ฿${penalty.toLocaleString()})`)
+          }
         } else {
-          addLog(`🎴 บอทเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (เสีย ฿${Math.abs(randomCard.amount).toLocaleString()})`)
+          setBot((b) => ({ ...b, money: b.money + randomCard.amount }))
+          addLog(`🎴 บอทเปิดการ์ด "${randomCard.title}": ${randomCard.desc} (ได้ +฿${randomCard.amount.toLocaleString()})`)
         }
         endBotTurn(doubleFlag, 1200)
       }
@@ -871,10 +1105,39 @@ function Game({ setCurrentPage }) {
         if (isBotOwned) {
           const rent = getTileRent(tile.id)
           const lvl = propertyLevels[tile.id] || 1
-          setPlayer((p) => ({ ...p, money: Math.max(0, p.money - rent) }))
+
+          // ตรวจสอบว่าเงินพอจ่ายค่าเช่าหรือไม่
+          if (player.money < rent) {
+            addLog(`💸 คุณตกที่ดินบอท (${tile.name} ขั้น ${lvl}) ต้องจ่ายค่าเช่า ฿${rent.toLocaleString()} แต่มีเงินไม่พอ! เข้าสู่วิกฤตการเงิน`)
+            setDebtCrisis({
+              debtor: 'player',
+              creditor: 'bot',
+              amount: rent,
+              reason: `ค่าเช่าที่ดิน "${tile.name}" ขั้น ${lvl}`,
+              doubleFlag,
+              tile,
+            })
+            return
+          }
+
+          // หักเงินค่าเช่าให้บอท
+          setPlayer((p) => ({ ...p, money: p.money - rent }))
           setBot((b) => ({ ...b, money: b.money + rent }))
           addLog(`💸 คุณตกที่ดินบอท (${tile.name} ขั้น ${lvl}) จ่ายค่าเช่า ฿${rent.toLocaleString()}`)
-          endPlayerTurnOrDouble(doubleFlag, 1000)
+
+          // หลังจ่ายค่าเช่า มีสิทธิ์ขอซื้อต่อที่ดินบอท (เทคโอเวอร์)
+          const takeoverPrice = Math.floor(tile.price * 1.5 + (lvl === 2 ? 700 : lvl === 3 ? 2000 : 0))
+          if (player.money - rent >= takeoverPrice) {
+            setCanTakeoverTile({
+              tile,
+              takeoverPrice,
+              doubleFlag,
+            })
+            return // รอผู้เล่นตัดสินใจ ซื้อต่อ หรือ ข้าม
+          } else {
+            addLog(`ℹ️ เงินไม่พอซื้อต่อที่ดิน "${tile.name}" จากบอท (ราคาซื้อต่อ ฿${takeoverPrice.toLocaleString()})`)
+            endPlayerTurnOrDouble(doubleFlag, 1000)
+          }
         } else if (isPlayerOwned) {
           // ตกที่ดินตัวเอง: อัปเกรดได้สูงสุด 3 ขั้น
           const currentLvl = propertyLevels[tile.id] || 1
@@ -896,9 +1159,33 @@ function Game({ setCurrentPage }) {
         if (isPlayerOwned) {
           const rent = getTileRent(tile.id)
           const lvl = propertyLevels[tile.id] || 1
-          setBot((b) => ({ ...b, money: Math.max(0, b.money - rent) }))
-          setPlayer((p) => ({ ...p, money: p.money + rent }))
-          addLog(`💰 บอทตกที่ดินของคุณ (${tile.name} ขั้น ${lvl}) จ่ายค่าเช่าให้คุณ ฿${rent.toLocaleString()}!`)
+
+          if (bot.money < rent) {
+            const ok = handleBotDebtCrisis('player', rent, `ค่าเช่าที่ดิน "${tile.name}" ขั้น ${lvl}`, doubleFlag)
+            if (!ok) return
+          } else {
+            setBot((b) => ({ ...b, money: b.money - rent }))
+            setPlayer((p) => ({ ...p, money: p.money + rent }))
+            addLog(`💰 บอทตกที่ดินของคุณ (${tile.name} ขั้น ${lvl}) จ่ายค่าเช่าให้คุณ ฿${rent.toLocaleString()}!`)
+          }
+
+          // บอทพิจารณาซื้อต่อที่ดิน (เทคโอเวอร์) หากมีเงินเหลือเยอะพอ
+          const takeoverPrice = Math.floor(tile.price * 1.5 + (lvl === 2 ? 700 : lvl === 3 ? 2000 : 0))
+          if (bot.money >= takeoverPrice + 3500 && Math.random() < 0.6) {
+            setBot((b) => ({
+              ...b,
+              money: b.money - takeoverPrice,
+              owned: [...b.owned, tile.id],
+            }))
+            setPlayer((p) => ({
+              ...p,
+              money: p.money + takeoverPrice,
+              owned: p.owned.filter((id) => id !== tile.id),
+            }))
+            addLog(`🚨 บอททุ่มเงิน ฿${takeoverPrice.toLocaleString()} ขอซื้อต่อที่ดิน "${tile.name}" ของคุณไปแล้ว!`)
+          } else {
+            addLog(`🤖 บอทตัดสินใจไม่ซื้อต่อที่ดิน "${tile.name}"`)
+          }
           endBotTurn(doubleFlag, 1000)
         } else if (isBotOwned) {
           // บอทตกที่ดินตัวเอง: พิจารณาอัปเกรด
@@ -1004,6 +1291,9 @@ function Game({ setCurrentPage }) {
     setHasRolled(false)
     setIsDoubleRoll(false)
     setCanUpgradeTile(null)
+    setCanTakeoverTile(null)
+    setDebtCrisis(null)
+    setBankruptcyWinner(null)
     setLastDrawnCard(null)
     setDice1(1)
     setDice2(1)
@@ -1027,6 +1317,10 @@ function Game({ setCurrentPage }) {
     turn === 'player' &&
     !isMoving &&
     !isRolling &&
+    !debtCrisis &&
+    !canTakeoverTile &&
+    !canUpgradeTile &&
+    !bankruptcyWinner &&
     ['property', 'transport', 'utility'].includes(currentTile.type) &&
     !player.owned.includes(currentTile.id) &&
     !bot.owned.includes(currentTile.id) &&
@@ -1258,6 +1552,8 @@ function Game({ setCurrentPage }) {
           data={player}
           propertyLevels={propertyLevels}
           getTileRent={getTileRent}
+          getTileSellPrice={getTileSellPrice}
+          onSellProperty={(tileId) => handleSellProperty(tileId, false)}
           hoveredTileId={hoveredTileId}
           setHoveredTileId={setHoveredTileId}
           className={mobileView === 'player' ? 'flex' : 'hidden lg:flex'}
@@ -1494,9 +1790,9 @@ function Game({ setCurrentPage }) {
                   {/* ปุ่มทอยเต๋าของผู้เล่น (ปิดการกดทันทีเมื่อทอยเสร็จ หรือเมื่อไม่ใช่ตาของผู้เล่น) */}
                   <button
                     onClick={handlePlayerRoll}
-                    disabled={isRolling || isMoving || turn !== 'player' || hasRolled}
+                    disabled={isRolling || isMoving || turn !== 'player' || hasRolled || debtCrisis || canTakeoverTile || canUpgradeTile || bankruptcyWinner}
                     className={`flex items-center gap-1.5 px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl font-black text-xs sm:text-sm shadow-md transition transform active:scale-95 cursor-pointer ${
-                      turn === 'player' && !hasRolled && !isRolling && !isMoving
+                      turn === 'player' && !hasRolled && !isRolling && !isMoving && !debtCrisis && !canTakeoverTile && !canUpgradeTile && !bankruptcyWinner
                         ? 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 hover:shadow-amber-500/30 ring-2 ring-amber-300/60'
                         : 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-60'
                     }`}
@@ -1659,6 +1955,144 @@ function Game({ setCurrentPage }) {
                   </div>
                 </div>
               )}
+              {/* ================= MODAL: ปุ่มซื้อต่อที่ดินของบอท (เทคโอเวอร์) ================= */}
+              {canTakeoverTile && (
+                <div className="absolute inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 z-40 rounded-xl animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex flex-col items-center gap-2.5 p-4 bg-slate-950/95 backdrop-blur-md rounded-2xl border-2 border-indigo-400/90 shadow-2xl max-w-xs sm:max-w-sm w-full text-center">
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 mb-1">
+                        <Sparkles className="w-3 h-3 text-indigo-400 animate-spin" />
+                        <span>ตกที่ดินคู่แข่ง • สิทธิ์ซื้อต่อที่ดิน!</span>
+                      </span>
+                      <h3 className="text-base sm:text-lg font-black text-white">
+                        ซื้อต่อ "{canTakeoverTile.tile.name}" จากบอท?
+                      </h3>
+                      <p className="text-xs text-indigo-200/80 mt-0.5">
+                        ราคาซื้อต่อ ฿{canTakeoverTile.takeoverPrice.toLocaleString()} • ค่าเช่า ฿{getTileRent(canTakeoverTile.tile.id).toLocaleString()} (ขั้น {propertyLevels[canTakeoverTile.tile.id] || 1})
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full justify-center mt-1">
+                      <button
+                        onClick={() => handlePlayerTakeover(canTakeoverTile)}
+                        className="flex-1 py-2.5 px-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 hover:from-indigo-600 hover:to-purple-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-indigo-500/40 hover:scale-105 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5 ring-2 ring-indigo-300/50"
+                      >
+                        <Building2 className="w-4 h-4 shrink-0" />
+                        <span>ซื้อต่อ ฿{canTakeoverTile.takeoverPrice.toLocaleString()}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handlePlayerSkipTakeover(canTakeoverTile)}
+                        className="py-2.5 px-4 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs sm:text-sm rounded-xl hover:scale-105 active:scale-95 transition cursor-pointer border border-slate-500 shrink-0"
+                      >
+                        ข้าม
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= MODAL: ภาวะวิกฤตการเงิน / ขายที่ดินเพื่อรอดพ้นล้มละลาย ================= */}
+              {debtCrisis && debtCrisis.debtor === 'player' && (
+                <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 z-50 rounded-xl animate-in fade-in zoom-in-95">
+                  <div className="flex flex-col items-center gap-2.5 p-4 bg-slate-950 rounded-2xl border-2 border-rose-500 shadow-2xl max-w-xs sm:max-w-sm w-full text-center">
+                    <div className="w-10 h-10 rounded-full bg-rose-500/20 border border-rose-500/50 flex items-center justify-center text-rose-400 text-xl animate-pulse">
+                      ⚠️
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-rose-400">
+                        วิกฤตการเงิน! เงินไม่พอจ่าย
+                      </h3>
+                      <p className="text-xs text-slate-300 mt-0.5">
+                        ต้องจ่าย: <b className="text-amber-400 font-mono">฿{debtCrisis.amount.toLocaleString()}</b> ({debtCrisis.reason})
+                      </p>
+                      <p className="text-xs text-rose-300 mt-0.5">
+                        เงินของคุณ: <b className="font-mono">฿{player.money.toLocaleString()}</b> (ขาดอีก <b className="font-mono text-rose-400">฿{Math.max(0, debtCrisis.amount - player.money).toLocaleString()}</b>)
+                      </p>
+                    </div>
+
+                    {player.owned.length > 0 ? (
+                      <div className="w-full text-left space-y-1">
+                        <p className="text-[10px] font-bold text-amber-300">
+                          🏬 ขายที่ดินเพื่อนำเงินมาจ่าย (ที่ดินจะกลับมาว่างเปล่า):
+                        </p>
+                        <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                          {player.owned.map((tileId) => {
+                            const t = INITIAL_TILES[tileId]
+                            const sPrice = getTileSellPrice(tileId)
+                            return (
+                              <div
+                                key={tileId}
+                                className="flex items-center justify-between p-1.5 bg-slate-900 rounded-lg border border-white/10 text-xs"
+                              >
+                                <div className="truncate pr-2">
+                                  <span className="font-bold text-white block truncate">{t.name}</span>
+                                  <span className="text-[9px] text-amber-300/80 font-mono">
+                                    ขายได้: ฿{sPrice.toLocaleString()}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => handleSellProperty(tileId, false)}
+                                  className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-md text-[10px] cursor-pointer shrink-0 active:scale-95 transition"
+                                >
+                                  ขายที่ดิน
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-300">
+                        คุณไม่มีที่ดินเหลือให้ขายแล้ว!
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 w-full mt-1">
+                      {player.money >= debtCrisis.amount ? (
+                        <button
+                          onClick={handleResolvePlayerDebt}
+                          className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95"
+                        >
+                          ✅ ชำระเงิน ฿{debtCrisis.amount.toLocaleString()} (รอดพ้นล้มละลาย)
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handlePlayerDeclareBankruptcy}
+                          className="flex-1 py-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95"
+                        >
+                          💀 ยอมรับการล้มละลาย (แพ้เกม)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= MODAL: จบเกมด้วยการล้มละลาย ================= */}
+              {bankruptcyWinner && (
+                <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 rounded-2xl animate-in fade-in zoom-in-95">
+                  <div className="flex flex-col items-center gap-3 p-6 bg-slate-900 rounded-3xl border-2 border-amber-400 shadow-2xl max-w-sm w-full text-center">
+                    <div className="text-5xl animate-bounce">
+                      {bankruptcyWinner === 'player' ? '🏆' : '💀'}
+                    </div>
+                    <h2 className="text-2xl font-black text-white">
+                      {bankruptcyWinner === 'player' ? 'คุณเป็นผู้ชนะ!' : 'คุณล้มละลาย!'}
+                    </h2>
+                    <p className="text-xs text-slate-300">
+                      {bankruptcyWinner === 'player'
+                        ? '🎉 ยินดีด้วย! บอทเงินหมดและไม่สามารถจ่ายหนี้ได้จนล้มละลาย คุณคือมหาเศรษฐีแห่ง PROJECT-T!'
+                        : '💸 คุณเงินหมดและไม่มีที่ดินเหลือพอที่จะจ่ายหนี้ บอท AI เป็นผู้ชนะในเกมนี้'}
+                    </p>
+                    <button
+                      onClick={handleReset}
+                      className="mt-3 px-6 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-sm rounded-xl shadow-lg cursor-pointer hover:scale-105 active:scale-95 transition"
+                    >
+                      🔄 เล่นใหม่อีกครั้ง
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1669,6 +2103,7 @@ function Game({ setCurrentPage }) {
           data={bot}
           propertyLevels={propertyLevels}
           getTileRent={getTileRent}
+          getTileSellPrice={getTileSellPrice}
           hoveredTileId={hoveredTileId}
           setHoveredTileId={setHoveredTileId}
           className={mobileView === 'bot' ? 'flex' : 'hidden lg:flex'}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Moon,
   Sun,
@@ -247,6 +247,15 @@ function WerewolfGame({ setCurrentPage }) {
   const [morningMessages, setMorningMessages] = useState([])
   const [botThoughts, setBotThoughts] = useState({})
   const [userChatInput, setUserChatInput] = useState('')
+  const chatInputRef = useRef(null)
+
+  // เลือกข้อความทางลัดลงในช่องพิมพ์ข้อความ (ยังไม่กดส่ง)
+  const handleSelectQuickMessage = (text) => {
+    setUserChatInput(text)
+    setTimeout(() => {
+      chatInputRef.current?.focus()
+    }, 50)
+  }
 
   // สรุปเหตุการณ์ยามเช้า (Morning Report) และ จบเกม (Game Over)
   const [morningReport, setMorningReport] = useState(null)
@@ -1822,26 +1831,30 @@ function WerewolfGame({ setCurrentPage }) {
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[10px]">
                     <span className="text-slate-400 font-bold shrink-0">พิมพ์ด่วน:</span>
                     <button
-                      onClick={() => handleSendChatMessage('ฉันเป็นคนดีบริสุทธิ์นะ อย่าเพิ่งรีบโหวตฉันเลย!')}
-                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+                      onClick={() => handleSelectQuickMessage('ฉันเป็นคนดีบริสุทธิ์นะ อย่าเพิ่งรีบโหวตฉันเลย!')}
+                      disabled={!userPlayer?.isAlive}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
                     >
                       🛡️ ฉันเป็นคนดี
                     </button>
                     <button
-                      onClick={() => handleSendChatMessage('ฉันสังเกตเห็นบางคนทำตัวเงียบผิดปกติ เช้านี้มีพิรุธจัง!')}
-                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+                      onClick={() => handleSelectQuickMessage('ฉันสังเกตเห็นบางคนทำตัวเงียบผิดปกติ เช้านี้มีพิรุธจัง!')}
+                      disabled={!userPlayer?.isAlive}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
                     >
                       👀 มีคนเงียบผิดปกติ
                     </button>
                     <button
-                      onClick={() => handleSendChatMessage('ทุกคนอย่าเพิ่งใจร้อนนะ ฟังเหตุผลกันก่อนค่อยตัดสินใจ')}
-                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+                      onClick={() => handleSelectQuickMessage('ทุกคนอย่าเพิ่งใจร้อนนะ ฟังเหตุผลกันก่อนค่อยตัดสินใจ')}
+                      disabled={!userPlayer?.isAlive}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
                     >
                       🕊️ อย่าเพิ่งใจร้อน
                     </button>
                     <button
-                      onClick={() => handleSendChatMessage('ฉันมั่นใจว่าในหมู่บ้านเรามีหมาป่าซ่อนตัวอยู่แน่นอน!')}
-                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+                      onClick={() => handleSelectQuickMessage('ฉันมั่นใจว่าในหมู่บ้านเรามีหมาป่าซ่อนตัวอยู่แน่นอน!')}
+                      disabled={!userPlayer?.isAlive}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
                     >
                       🐺 มีหมาป่าซ่อนอยู่
                     </button>
@@ -1856,6 +1869,7 @@ function WerewolfGame({ setCurrentPage }) {
                     className="flex items-center gap-2"
                   >
                     <input
+                      ref={chatInputRef}
                       type="text"
                       value={userChatInput}
                       onChange={(e) => setUserChatInput(e.target.value)}
