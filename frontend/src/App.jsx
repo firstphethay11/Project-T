@@ -32,7 +32,7 @@ function App() {
             {currentPage === 'home' && <HomePage setCurrentPage={setCurrentPage} />}
             {currentPage === 'about' && <AboutPage />}
             {currentPage === 'guide' && <GuidePage setCurrentPage={setCurrentPage} />}
-            {currentPage === 'game' && <Game />}
+            {currentPage === 'game' && <Game setCurrentPage={setCurrentPage} />}
           </main>
 
           {/* ส่วนท้ายเว็บ - ซ่อนในหน้าเกมเพื่อให้แสดงผลเต็มหน้าจอ 1 หน้าพอดี */}
