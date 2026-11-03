@@ -49,7 +49,9 @@ function App() {
           {/* ส่วนเนื้อหาหลักที่สลับตามปุ่มที่กด */}
           <main
             className={`flex-grow w-full mx-auto ${
-              currentPage === 'uno'
+              currentPage === 'game'
+                ? 'max-w-[1480px] px-2 sm:px-4 py-2 sm:py-3 flex flex-col justify-center'
+                : currentPage === 'uno'
                 ? 'max-w-7xl px-3 sm:px-6 py-4 flex flex-col justify-center'
                 : isGameView
                 ? 'max-w-5xl px-4 py-3 flex flex-col justify-center'
