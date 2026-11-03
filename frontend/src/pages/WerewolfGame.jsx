@@ -209,9 +209,9 @@ function WerewolfGame({ setCurrentPage }) {
   const [gameCycle, setGameCycle] = useState('night')
   const [roundNumber, setRoundNumber] = useState(1)
 
-  // จำนวนบอท (11 ตัว + คุณ 1 คน = 12 คน)
-  const botCount = 11
-  const totalPlayers = botCount + 1
+  // กำหนดขอบเขตจำนวนผู้เล่น (ผลรวมขั้นต่ำ 5 คน และสูงสุด 12 คน)
+  const MIN_PLAYERS = 5
+  const MAX_PLAYERS = 12
 
   // จำนวนของแต่ละบทบาทที่กำหนด
   const [roleCounts, setRoleCounts] = useState(() => {
@@ -254,11 +254,14 @@ function WerewolfGame({ setCurrentPage }) {
 
   // คำนวณจำนวนบทบาทที่จัดไปแล้วทั้งหมด
   const currentTotalAssigned = Object.values(roleCounts).reduce((a, b) => a + b, 0)
-  const isCountBalanced = currentTotalAssigned === totalPlayers
+  const hasWerewolf =
+    (roleCounts.werewolf || 0) + (roleCounts.wolf_seer || 0) + (roleCounts.wolf_pup || 0) > 0
+  const isCountBalanced =
+    currentTotalAssigned >= MIN_PLAYERS && currentTotalAssigned <= MAX_PLAYERS && hasWerewolf
 
   // ปรับเพิ่มจำนวนบทบาท
   const handleIncrease = (roleId) => {
-    if (currentTotalAssigned >= totalPlayers) return
+    if (currentTotalAssigned >= MAX_PLAYERS) return
     setRoleCounts((prev) => ({
       ...prev,
       [roleId]: (prev[roleId] || 0) + 1,
@@ -274,20 +277,46 @@ function WerewolfGame({ setCurrentPage }) {
     }))
   }
 
-  // รีเซ็ตเป็นค่าแนะนำสมดุลสำหรับ 12 คน
-  const handleAutoBalance = () => {
-    const balanced = {
-      werewolf: 2,
-      wolf_seer: 1,
-      wolf_pup: 1,
-      seer: 1,
-      bodyguard: 1,
-      hunter: 1,
-      witch: 1,
-      villager: 3,
-      madman: 1,
+  // ชุดสมดุลแนะนำตามจำนวนคน (5, 8, 12 คน)
+  const handleApplyPreset = (targetCount) => {
+    if (targetCount === 5) {
+      setRoleCounts({
+        werewolf: 1,
+        wolf_seer: 0,
+        wolf_pup: 0,
+        seer: 1,
+        bodyguard: 1,
+        hunter: 0,
+        witch: 0,
+        villager: 2,
+        madman: 0,
+      })
+    } else if (targetCount === 8) {
+      setRoleCounts({
+        werewolf: 2,
+        wolf_seer: 0,
+        wolf_pup: 0,
+        seer: 1,
+        bodyguard: 1,
+        hunter: 1,
+        witch: 0,
+        villager: 3,
+        madman: 0,
+      })
+    } else {
+      // 12 คน (ชุดเต็ม)
+      setRoleCounts({
+        werewolf: 2,
+        wolf_seer: 1,
+        wolf_pup: 1,
+        seer: 1,
+        bodyguard: 1,
+        hunter: 1,
+        witch: 1,
+        villager: 3,
+        madman: 1,
+      })
     }
-    setRoleCounts(balanced)
   }
 
   // สุ่มแจกบทบาทและเริ่มเกม
@@ -307,6 +336,9 @@ function WerewolfGame({ setCurrentPage }) {
       ;[deck[i], deck[j]] = [deck[j], deck[i]]
     }
 
+    const activeBotsCount = currentTotalAssigned - 1
+    const activeBotNames = BOT_NAMES.slice(0, activeBotsCount)
+
     const playerList = [
       {
         id: 0,
@@ -315,7 +347,7 @@ function WerewolfGame({ setCurrentPage }) {
         role: deck[0],
         isAlive: true,
       },
-      ...BOT_NAMES.map((name, index) => ({
+      ...activeBotNames.map((name, index) => ({
         id: index + 1,
         name: name,
         isUser: false,
@@ -417,7 +449,7 @@ function WerewolfGame({ setCurrentPage }) {
     return false
   }
 
-  // ฟังก์ชันสร้างความคิดและบทสนทนายามเช้าของบอท (Bot Dialogue System)
+  // ฟังก์ชันสร้างความคิดและบทสนทนายามเช้าของบอทแบบมีกลยุทธ์ลึกซึ้ง (Challenging & Deceptive Dialogue)
   const generateMorningDiscussions = (currentRoster, deadList, round) => {
     const livingBots = currentRoster.filter((p) => !p.isUser && p.isAlive)
     const livingNonWolves = currentRoster.filter((p) => p.isAlive && p.role.team !== 'werewolf')
@@ -431,13 +463,17 @@ function WerewolfGame({ setCurrentPage }) {
     newMessages.push({
       id: `sys-${round}`,
       senderId: -1,
-      senderName: '📢 ประกาศจากศาลหมู่บ้าน',
+      senderName: '📢 ศาลกลางเมือง',
       isSystem: true,
       text: deadName
-        ? `รุ่งเช้าวันที่ ${round} มาถึงแล้ว... เมื่อคืนพบผู้เสียชีวิต: ${deadName} ขอให้ชาวบ้านร่วมกันถกเถียงและจับตัวคนร้าย!`
-        : `รุ่งเช้าวันที่ ${round} มาถึงแล้ว... เมื่อคืนไม่มีผู้เสียชีวิต ทุกคนปลอดภัยดี ร่วมกันถกเถียงหาตัวผู้ต้องสงสัย!`,
+        ? `รุ่งอรุณวันที่ ${round} มาถึงแล้ว... เมื่อคืนพบศพ: ${deadName} ขอให้ชาวบ้านทุกคนเปิดการอภิปราย วิเคราะห์เบาะแส และจับพิรุธคนร้ายให้ได้!`
+        : `รุ่งอรุณวันที่ ${round} มาถึงแล้ว... เมื่อคืนไม่มีผู้เสียชีวิต ทุกคนปลอดภัยดี แต่สงครามจิตวิทยากำลังจะเริ่มขึ้นในลานประชุม!`,
       time: `เช้า วันที่ ${round}`,
     })
+
+    // สุ่มเลือกหมาป่า 1 ตัวที่มีโอกาสแกล้งเคลมบทบาทเป็น Seer ปลอม (Fake Seer Counter-claim) เพื่อสร้างความสับสน
+    const fakeSeerCandidate = livingWolves.find((w) => !w.isUser)
+    const willFakeSeerClaim = fakeSeerCandidate && Math.random() > 0.45
 
     livingBots.forEach((bot) => {
       let speech = ''
@@ -446,79 +482,112 @@ function WerewolfGame({ setCurrentPage }) {
 
       switch (bot.role.id) {
         case 'seer': {
-          if (livingWolves.length > 0 && Math.random() > 0.4) {
+          // ผู้หยั่งรู้ตัวจริง
+          if (livingWolves.length > 0 && Math.random() > 0.35) {
             const foundWolf = livingWolves[Math.floor(Math.random() * livingWolves.length)]
-            speech = `ทุกคนฟังฉัน! เมื่อคืนฉันใช้พลังส่องดู "${foundWolf.name}" มาแล้ว... ปรากฏว่าเป็นหมาป่าตัวจริง! รีบโหวตประหารด่วน 👁️`
+            const seerAccusations = [
+              `ทุกคนฟังฉันให้ดี! ฉันคือผู้หยั่งรู้ตัวจริง เมื่อคืนฉันใช้ญาณส่องดู "${foundWolf.name}" พบออร่าหมาป่าชัดเจน! ใครที่พยายามช่วยแก้ต่างให้เขา น่าสงสัยเป็นพวกเดียวกัน! 👁️`,
+              `ฉันขอเปิดเผยข้อมูลสำคัญ! เมื่อคืนฉันส่อง "${foundWolf.name}" แล้วพบว่าเป็นหมาป่าแน่นอน ถ้าวันนี้ไม่ประหารเขา คืนนี้หมู่บ้านเราจะสูญเสียหนักแน่!`,
+              `ฉันแอบส่องดู "${foundWolf.name}" มา... อย่าปล่อยให้เขาหลอกพวกเราอีกต่อไป โหวตเขาเลย!`,
+            ]
+            speech = seerAccusations[Math.floor(Math.random() * seerAccusations.length)]
           } else if (livingNonWolves.length > 0) {
             const innocent = livingNonWolves[Math.floor(Math.random() * livingNonWolves.length)]
-            speech = `เมื่อคืนฉันส่องดู "${innocent.name}" แล้ว ยืนยันว่าเขาเป็นคนดีบริสุทธิ์ อย่าไปโหวตเขานะ!`
+            const seerClears = [
+              `เมื่อคืนฉันส่องดู "${innocent.name}" มาแล้ว ยืนยันว่าเขาเป็นคนดีบริสุทธิ์ 100%! อย่าไปหลงเชื่อคนที่พยายามป้ายสีเขาเด็ดขาด`,
+              `ฉันใช้พลังตรวจสอบ "${innocent.name}" แล้ว ปลอดภัยแน่นอน ขอให้ทุกคนพุ่งเป้าไปที่คนที่ยังไม่เปิดเผยตัวตน!`,
+            ]
+            speech = seerClears[Math.floor(Math.random() * seerClears.length)]
           } else {
-            speech = `ฉันกำลังรวบรวมเบาะแส คืนนี้จะใช้พลังหาตัวหมาป่าที่แฝงตัวอยู่ให้เจอ!`
+            speech = `ฉันกำลังเฝ้าสังเกตพฤติกรรมการชี้นำโหวตของแต่ละคนอย่างใกล้ชิด คืนนี้จะใช้พลังหาตัวหัวหน้าหมาป่าให้เจอ!`
           }
           break
         }
-        case 'wolf_seer': {
-          const target = randomOther?.name || 'ใครบางคน'
-          const wolfFakes = [
-            `ฉันมีลางสังหรณ์ว่า "${target}" กำลังพยายามตีเนียนเป็นคนดี ระวังตัวไว้นะทุกคน... 🔮`,
-            `อย่าเพิ่งหลงเชื่อใครง่ายๆ นะ ฉันคิดว่าหมาป่าตัวจริงกำลังเงียบเพื่อหลบสายตา!`,
-            `เมื่อคืนได้ยินเสียงกุกกักแถวบ้าน "${target}" น่าสงสัยสุดๆ!`,
-          ]
-          speech = wolfFakes[Math.floor(Math.random() * wolfFakes.length)]
-          break
-        }
+
+        case 'wolf_seer':
         case 'werewolf':
         case 'wolf_pup': {
-          const nonWolfTarget = livingNonWolves.length > 0
-            ? livingNonWolves[Math.floor(Math.random() * livingNonWolves.length)].name
+          // ฝ่ายหมาป่า: ใช้กลยุทธ์ลึกซึ้ง (Bluff, Fake Claim, Deflection)
+          const nonWolfTargets = livingNonWolves.filter((p) => p.id !== bot.id)
+          const targetInnocent = nonWolfTargets.length > 0
+            ? nonWolfTargets[Math.floor(Math.random() * nonWolfTargets.length)]?.name
             : 'ใครบางคน'
-          const wolfLies = [
-            `เมื่อคืนฉันได้ยินเสียงเห่าหอนแถวบ้านของ "${nonWolfTarget}"... ฉันว่าเขาต้องสงสัยที่สุด! 🐺`,
-            `ฉันเป็นแค่ชาวบ้านตัวเล็กๆ คนหนึ่งนะ เมื่อคืนกลัวจนตัวสั่น อย่าเพิ่งรีบโหวตฉันเลย 🥺`,
-            `สังเกตมั้ยว่า "${nonWolfTarget}" ดูทำตัวไม่ค่อยเป็นธรรมชาติ เช้านี้มีพิรุธจัง!`,
-            deadName
-              ? `น่าสงสาร ${deadName} มาก... เราต้องสามัคคีกันหาตัวหมาป่าตัวจริงให้เจอนะทุกคน`
-              : `โชคดีที่เมื่อคืนไม่มีใครตาย แต่เราต้องระวังตัว คนที่น่าสงสัยคือ "${nonWolfTarget}"`,
+
+          // กลยุทธ์ 1: สวมรอยเป็น Seer ปลอม (ถ้าได้รับเลือก)
+          if (willFakeSeerClaim && bot.id === fakeSeerCandidate?.id) {
+            const fakeSeerLines = [
+              `ทุกคนอย่าไปฟังคนอื่น! ฉันต่างหากคือผู้หยั่งรู้ตัวจริง! เมื่อคืนฉันส่องดู "${targetInnocent}" แล้วพบว่าเป็นหมาป่า! รีบช่วยกันโหวตประหารด่วน 🔮`,
+              `ฉันขอเปิดเผยตัวตนก่อนที่จะสายเกินไป! ฉันคือ Seer และผลการส่องเมื่อคืนชี้ชัดว่า "${targetInnocent}" คือคนร้ายที่แฝงตัวอยู่!`,
+            ]
+            speech = fakeSeerLines[Math.floor(Math.random() * fakeSeerLines.length)]
+          } else {
+            // กลยุทธ์ 2: ปั่นกระแส เบี่ยงเบนความสนใจ หรืออ้างเป็นบทบาทป้องกัน
+            const wolfDeceptions = [
+              `สังเกตมั้ยว่าตอนมีคนเสนอชื่อโหวต "${targetInnocent}" ดูมีท่าทีกระวนกระวายผิดปกติ? ฉันว่าเขากำลังกลัวความจริงเปิดเผย!`,
+              `ฉันเป็นแค่ชาวบ้านธรรมดาที่ไม่มีพลังอะไรเลย... ถ้าพวกคุณหลงกลรีบโหวตฉันไป ฝ่ายชาวบ้านจะยิ่งเสียเปรียบนะ! 🥺`,
+              `คนที่คอยพูดชี้นำโหวตตั้งแต่เช้าเนี่ยแหละตัวดี! หมาป่ามักจะรีบหาแพะรับบาปเพื่อกลบเกลื่อนร่องรอยตัวเอง`,
+              deadName
+                ? `ดูจากการที่ "${deadName}" โดนเก็บเมื่อคืน หมาป่าต้องจงใจตัดกำลังคนที่จับพิรุธเก่งแน่ๆ... ฉันสงสัย "${targetInnocent}" มากที่สุด!`
+                : `เมื่อคืนที่ไม่มีใครตาย อาจเป็นเพราะผู้พิทักษ์ทำงาน หรือไม่หมาป่าก็จงใจไม่ลงมือเพื่อปั่นหัวพวกเรา!`,
+              `ฉันคิดว่ามีคนกำลังแอบอ้างบทบาทเพื่อเอาตัวรอด เราต้องตั้งสติแล้วดูว่าใครพูดจาขัดแย้งกับตัวเองมากที่สุด!`,
+            ]
+            speech = wolfDeceptions[Math.floor(Math.random() * wolfDeceptions.length)]
+          }
+          break
+        }
+
+        case 'madman': {
+          // คนบ้า (Madman): ไม่พูดโต้งๆ ว่าฉันคือหมาป่า แต่แกล้งหลุดปากมีพิรุธอย่างแนบเนียน เพื่อล่อให้ชาวบ้านรุมโหวต!
+          const madmindLines = [
+            `เอ่อ... เมื่อคืนฉันไม่ได้ยินเสียงเห่าหอนเลยนะ! (เอ๊ะ ทำไมทุกคนมองฉันแบบนั้นล่ะ ฉันไม่ได้หลุดพูดอะไรแปลกๆ ออกไปใช่มั้ย? 😅)`,
+            `ฉันว่าการที่ ${deadName || 'คนเมื่อคืน'} ถูกกำจัด มันเป็นการเดินหมากที่ฉลาดมาก... เอ่อ ฉันหมายถึงในมุมมองของคนร้ายน่ะนะ!`,
+            `ทุกคนจะโหวตฉันก็ได้นะถ้าคิดว่าฉันคือหมาป่า... แต่ฉันเตือนไว้ก่อนเลยนะว่าถ้าฉันตาย หมู่บ้านจะต้องเสียใจแน่นอน! (แอบยิ้ม)`,
+            `ทำไมทุกคนถึงต้องจ้องจับผิดกันขนาดนี้นะ? รีบๆ โหวตฉันไปให้จบๆ เรื่องเลยสิ จะได้รู้กันไปเลย! 🏆`,
+            `ฉันมีเบาะแสสำคัญมาก แต่ฉันจะไม่บอกพวกแกหรอก เว้นแต่พวกแกจะกล้าโหวตประหารฉันในวันนี้! 🤪`,
           ]
-          speech = wolfLies[Math.floor(Math.random() * wolfLies.length)]
+          speech = madmindLines[Math.floor(Math.random() * madmindLines.length)]
           break
         }
-        case 'bodyguard': {
-          speech = deadList && deadList.length === 0
-            ? `เมื่อคืนฉันไปวางกำลังคุ้มกันอย่างเต็มที่ โชคดีจริงๆ ที่ทุกคนรอดปลอดภัยในเช้านี้ 🛡️`
-            : `เสียใจด้วยจริงๆ ที่คุ้มกันไม่ทัน... วันนี้ต้องช่วยกันลากคอคนร้ายมาลงโทษให้ได้!`
-          break
-        }
+
         case 'hunter': {
           const hunterLines = [
-            `ถ้าใครกล้าโหวตประหารฉัน ฉันไม่ยอมตายเปล่าแน่ ปืนในมือฉันพร้อมลั่นไกพาไปด้วยคนหนึ่ง! 🏹`,
-            `ฉันจับตามองทุกคนอยู่ ใครทำตัวแปลกๆ หรือชี้นำโหวต ระวังตัวไว้ให้ดี!`,
+            `ขอเตือนทุกคนไว้ตรงนี้เลยนะ! ใครที่คิดจะโหวตประหารฉัน ปืนในมือฉันพร้อมลั่นไกพาคนที่โหวตฉันลงหลุมไปด้วย 1 คนแน่นอน! 🏹`,
+            `ฉันกำลังจับตาดูคนที่พยายามโหมกระแสโหวตอยู่ ถ้าฉันถูกประหาร คนที่ชี้นำจะเป็นเป้าหมายแรกที่โดนกระสุนฉัน!`,
           ]
           speech = hunterLines[Math.floor(Math.random() * hunterLines.length)]
           break
         }
+
+        case 'bodyguard': {
+          const guardLines = deadList && deadList.length === 0
+            ? [
+                `เมื่อคืนฉันวางกำลังคุ้มกันอย่างรัดกุม โชคดีจริงๆ ที่ไม่มีใครเสียชีวิตในคืนนี้ ทุกคนตั้งสติแล้วค่อยๆ คิดนะ 🛡️`,
+                `โล่งอกที่เช้านี้ทุกคนยังอยู่ครบ ฉันยืนยันได้ว่าคนที่ฉันเฝ้าเมื่อคืนปลอดภัยแน่นอน!`,
+              ]
+            : [
+                `ฉันเสียใจด้วยจริงๆ ที่คุ้มกันไม่ทัน... วันนี้พวกเราต้องสามัคคีกันหาตัวหมาป่าที่แอบซ่อนอยู่ให้เจอ!`,
+                `การสูญเสียเมื่อคืนทำให้สถานการณ์บีบคั้นขึ้นมาก เราจะโหวตพลาดอีกไม่ได้แล้ว!`,
+              ]
+          speech = guardLines[Math.floor(Math.random() * guardLines.length)]
+          break
+        }
+
         case 'witch': {
-          speech = `กลิ่นอายความตายเมื่อคืนรุนแรงมาก... ขวดยาของฉันพร้อมทำงานเสมอ ใครคิดร้ายระวังตัวไว้ 🧪`
+          speech = `กลิ่นอายยาพิษและมนตร์ดำเมื่อคืนรุนแรงมาก... ขวดยาของฉันยังพร้อมทำงานเสมอ ใครที่คิดร้ายต่อหมู่บ้าน ระวังตัวไว้ให้ดี! 🧪`
           break
         }
-        case 'madman': {
-          const madLines = [
-            `ฮ่าๆๆๆ พวกแกไม่มีทางจับคนร้ายได้หรอก! ฉันยอมรับสารภาพเลยว่าฉันนี่แหละหมาป่า โหวตฉันสิ ประหารฉันเลย! 🤪`,
-            `โหวตฉันเลยสิ รออะไรอยู่ล่ะ? วันนี้ฉันต้องถูกนำตัวไปประหารให้ได้! 🏆`,
-            `ถ้าวันนี้พวกแกไม่กล้าโหวตประหารฉัน คืนนี้พวกแกทุกคนจะต้องเสียใจแน่ๆ ฮ่าๆๆ!`,
-          ]
-          speech = madLines[Math.floor(Math.random() * madLines.length)]
-          break
-        }
+
         default: {
-          const suspectName = randomOther?.name || 'ใครบางคน'
+          // ชาวบ้านทั่วไป (Villagers): มีการวิเคราะห์เชิงตรรกะ ตั้งข้อสังเกต
+          const suspect = randomOther?.name || 'ใครบางคน'
           const villagerLines = [
+            `ตอนนี้เริ่มมีคนพูดจาขัดแย้งกันแล้วนะ... ถ้ามีคนอ้างบทบาทชนกัน เราต้องฟังเหตุผลของทั้งสองฝ่ายก่อนลงมือโหวต!`,
+            `ฉันสังเกตดูท่าทีของ "${suspect}" แล้ว ดูเหมือนกำลังพยายามปกป้องใครบางคนอยู่ มีใครคิดเหมือนฉันบ้าง?`,
             deadName
-              ? `เมื่อคืนน่ากลัวมาก เสียใจกับ ${deadName} ด้วย... เราต้องรีบหาตัวหมาป่าให้เจอ!`
-              : `โล่งอกไปทีที่เมื่อคืนไม่มีใครตาย! แต่คืนถัดไปเราจะประมาทไม่ได้`,
-            `ฉันสังเกตดู "${suspectName}" แล้วดูมีพิรุธสุดๆ ในรอบนี้ มีใครคิดเหมือนฉันบ้าง?`,
-            `ทุกคนใจเย็นๆ นะ อย่าเพิ่งโหวตมั่ว ถ้าเราประหารคนดีไป หมาป่าจะได้เปรียบ!`,
-            `ใครมีเบาะแสหรือข้อมูลอะไรที่เป็นประโยชน์ ช่วยพูดออกมาหน่อยเถอะ!`,
+              ? `เสียใจกับ "${deadName}" ด้วย... แต่เราต้องไม่ตื่นตระหนกจนโหวตชาวบ้านด้วยกันเองออกไปนะ!`
+              : `โชคดีที่ไม่มีใครตาย แต่สังเกตมั้ยว่า "${suspect}" ดูเงียบผิดปกติจนน่าสงสัย?`,
+            `คนที่พูดเยอะเกินไปกับคนที่เงียบผิดปกติ ทั้งสองกลุ่มนี้น่ากลัวพอกัน เราต้องช่วยกันตั้งคำถามไล่ต้อน!`,
+            `อย่าเพิ่งรีบร้อนกดโหวตตามใครนะ ถ้าพวกเราชาวบ้านแตกคอกันเอง หมาป่าจะเข้าวินแน่นอน!`,
           ]
           speech = villagerLines[Math.floor(Math.random() * villagerLines.length)]
           break
@@ -568,31 +637,40 @@ function WerewolfGame({ setCurrentPage }) {
 
       let reply = ''
       if (mentionedBot) {
-        const defensiveReplies = [
-          `เฮ้ย คุณกล่าวหาฉันทำไม! ฉันเป็นผู้บริสุทธิ์นะ อย่ามาใส่ร้าย! 😠`,
-          `มีหลักฐานอะไรมาบอกว่าฉันเป็นหมาป่า? ฉันแค่เงียบเพราะกำลังคิดอยู่ต่างหาก!`,
-          `คุณพยายามเบี่ยงเบนความสนใจไปที่ฉัน หรือว่าคุณเองนั่นแหละที่เป็นหมาป่า! 👀`,
-        ]
-        reply = defensiveReplies[Math.floor(Math.random() * defensiveReplies.length)]
-      } else if (textToSend.includes('คนดี') || textToSend.includes('อย่าโหวต')) {
+        if (mentionedBot.role.team === 'werewolf') {
+          const wolfDefenses = [
+            `คุณ ${userPlayer.name} พยายามป้ายสีฉันทำไม! หรือว่าคุณเองนั่นแหละที่เป็นหมาป่าแล้วกำลังหาแพะรับบาป! 🐺`,
+            `ฉันมีเหตุผลของฉัน อย่ามากล่าวหากันลอยๆ ใครที่ร้อนตัวรีบชี้เป้าคนอื่นเนี่ยแหละน่าสงสัยที่สุด!`,
+            `อย่าไปหลงเชื่อคุณ ${userPlayer.name} นะทุกคน เขาพยายามชี้นำโหวตเพื่อตัดกำลังชาวบ้าน!`,
+          ]
+          reply = wolfDefenses[Math.floor(Math.random() * wolfDefenses.length)]
+        } else {
+          const innocentDefenses = [
+            `คุณกล่าวหาฉันแบบนี้มีหลักฐานชัดเจนมั้ย? ฉันเป็นผู้บริสุทธิ์ 100% ถ้าโหวตฉันไปหมู่บ้านจะเสียใจ! 😠`,
+            `ฉันแค่กำลังฟังข้อมูลอย่างรอบคอบ ไม่ได้แปลว่าฉันมีพิรุธสักหน่อย อย่ามาใส่ร้ายกันนะ!`,
+            `ฉันยินดีให้ตรวจสอบ แต่ขอเตือนว่าถ้ากำจัดฉันไป หมาป่าจะได้เปรียบทันที!`,
+          ]
+          reply = innocentDefenses[Math.floor(Math.random() * innocentDefenses.length)]
+        }
+      } else if (textToSend.includes('คนดี') || textToSend.includes('อย่าโหวต') || textToSend.includes('บริสุทธิ์')) {
         const doubtReplies = [
-          `ทุกคนก็อ้างว่าตัวเองเป็นคนดีทั้งนั้นแหละ... ต้องดูที่ผลการกระทำ!`,
-          `ฟังดูมีเหตุผลนะ แต่ฉันก็ยังไม่ปักใจเชื่อร้อยเปอร์เซ็นต์`,
-          `ได้เลย ฉันจะลองจับตาดูคนอื่นดูก่อนในรอบนี้`,
+          `ในสถานการณ์ที่บีบคั้นแบบนี้ ใครๆ ก็อ้างว่าตัวเองเป็นคนดีทั้งนั้นแหละ... ต้องดูว่าตอนโหวตจริงคุณจะเลือกใคร!`,
+          `คำพูดปากเปล่าเชื่อไม่ได้หรอก เราต้องดูการกระทำและผลการสืบสวน!`,
+          `ถ้าคุณเป็นคนดีจริง ลองบอกหน่อยสิว่าในสายตาคุณ ใครน่าสงสัยที่สุดในตอนนี้?`,
         ]
         reply = doubtReplies[Math.floor(Math.random() * doubtReplies.length)]
-      } else if (textToSend.includes('สงสัย') || textToSend.includes('โหวต')) {
+      } else if (textToSend.includes('สงสัย') || textToSend.includes('โหวต') || textToSend.includes('หมาป่า')) {
         const agreeReplies = [
-          `น่าคิดเหมือนกันนะ... ฉันเริ่มเห็นด้วยกับที่คุณพูดแล้วสิ`,
-          `เราต้องร่วมมือกัน ถ้าใครมีหลักฐานชัดเจนก็ชี้นำมาได้เลย!`,
-          `อย่าเพิ่งรีบร้อนลงคะแนนเลย ฟังทุกคนพูดให้ครบก่อน`,
+          `ถ้าคุณมั่นใจในข้อมูลนี้จริง ลองบอกเหตุผลเพิ่มหน่อยสิ ทำไมถึงเจาะจงคนนี้เป็นพิเศษ?`,
+          `ข้อสังเกตของคุณน่าสนใจมาก... ฉันจะลองจับตาดูคนนี้ตามที่คุณบอกในรอบโหวตนี้`,
+          `อย่าเพิ่งรีบร้อนกดดันให้คนอื่นคล้อยตาม มาฟังคำแก้ต่างของเขาก่อนเถอะ!`,
         ]
         reply = agreeReplies[Math.floor(Math.random() * agreeReplies.length)]
       } else {
         const generalReplies = [
-          `อืม น่าสนใจ... เดี๋ยวตอนลงคะแนนคงได้รู้กันว่าใครคิดยังไง`,
-          `เวลาประชุมมีจำกัด รีบตัดสินใจกันเถอะทุกคน! 🗳️`,
-          `ฉันเห็นด้วยนะ บรรยากาศเช้านี้ตึงเครียดมากจริงๆ`,
+          `อืม บรรยากาศในห้องประชุมเริ่มตึงเครียดขึ้นเรื่อยๆ แล้ว ทุกคนอย่าใช้อารมณ์ตัดสินนะ`,
+          `เวลาอภิปรายกำลังจะหมดลงแล้ว ใครมีข้อมูลสุดท้ายรีบพูดออกมาก่อนลงคะแนนประหาร! 🗳️`,
+          `สงครามจิตวิทยาในเช้านี้เข้มข้นมาก... เดี๋ยวผลการนับคะแนนจะบอกเองว่าใครโกหก!`,
         ]
         reply = generalReplies[Math.floor(Math.random() * generalReplies.length)]
       }
@@ -1098,7 +1176,7 @@ function WerewolfGame({ setCurrentPage }) {
           </div>
           <div>
             <span className="text-base font-black tracking-tight text-indigo-300">
-              🐺 เกมแวร์วูล์ฟ (11 บอท + คุณ)
+              🐺 เกมแวร์วูล์ฟ ({roster.length > 0 ? `${roster.length} คน: บอท ${roster.length - 1} + คุณ` : '5 - 12 คน'})
             </span>
             <span
               className={`ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full border ${
@@ -1111,7 +1189,7 @@ function WerewolfGame({ setCurrentPage }) {
                 ? gameCycle === 'night'
                   ? `🌙 ค่ำคืนที่ ${roundNumber} (ราตรีมืดมิด)`
                   : `☀️ กลางวันวันที่ ${roundNumber} (เปิดโหวตประหาร)`
-                : 'ห้อง 12 ผู้เล่น'}
+                : `ห้อง ${currentTotalAssigned} คน`}
             </span>
           </div>
         </div>
@@ -1146,36 +1224,62 @@ function WerewolfGame({ setCurrentPage }) {
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-black text-white">ตั้งค่าจำนวนคนในแต่ละบทบาท</h2>
                 <span className="text-xs text-indigo-400 font-semibold">
-                  (บอท 11 ตัว + คุณ = รวม 12 คน)
+                  (ขั้นต่ำ 5 คน - สูงสุด 12 คน)
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 กดปุ่ม <span className="text-indigo-300 font-bold">[+]</span> หรือ{' '}
-                <span className="text-indigo-300 font-bold">[-]</span> เพื่อปรับจำนวนคนให้ครบ 12 คนพอดี
+                <span className="text-indigo-300 font-bold">[-]</span> เพื่อจัดบทบาทอิสระ (รวมคุณ 1 คน + บอท{' '}
+                <span className="text-amber-300 font-bold">{Math.max(0, currentTotalAssigned - 1)}</span> ตัว)
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
               <div
-                className={`px-4 py-2 rounded-xl border text-center font-black ${
+                className={`px-3.5 py-1.5 rounded-xl border text-center font-black ${
                   isCountBalanced
                     ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300'
                     : 'bg-amber-950/80 border-amber-500 text-amber-300'
                 }`}
               >
-                <div className="text-[10px] uppercase tracking-wider opacity-80">จัดบทบาทแล้ว</div>
-                <div className="text-lg">
-                  {currentTotalAssigned} / {totalPlayers} คน
+                <div className="text-[9px] uppercase tracking-wider opacity-80">
+                  {currentTotalAssigned < MIN_PLAYERS
+                    ? `ขาดอีก ${MIN_PLAYERS - currentTotalAssigned} คน`
+                    : !hasWerewolf
+                    ? 'ต้องมีหมาป่า!'
+                    : currentTotalAssigned > MAX_PLAYERS
+                    ? 'เกิน 12 คน'
+                    : 'ผลรวมผู้เล่น'}
+                </div>
+                <div className="text-base">
+                  {currentTotalAssigned} / 5-12 คน
                 </div>
               </div>
 
-              <button
-                onClick={handleAutoBalance}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs rounded-xl border border-slate-700 transition cursor-pointer"
-                title="ตั้งค่าชุดสมดุล 12 คนให้อัตโนมัติ"
-              >
-                ⚡ ชุดสมดุล
-              </button>
+              {/* ปุ่มชุดสมดุลแบบด่วน 5, 8, 12 คน */}
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button
+                  onClick={() => handleApplyPreset(5)}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[11px] rounded-lg transition cursor-pointer"
+                  title="ชุดแนะนำสำหรับ 5 คน (หมาป่า 1, ตรวจ 1, การ์ด 1, ชาวบ้าน 2)"
+                >
+                  ⚡ 5 คน
+                </button>
+                <button
+                  onClick={() => handleApplyPreset(8)}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[11px] rounded-lg transition cursor-pointer"
+                  title="ชุดแนะนำสำหรับ 8 คน"
+                >
+                  ⚡ 8 คน
+                </button>
+                <button
+                  onClick={() => handleApplyPreset(12)}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[11px] rounded-lg transition cursor-pointer"
+                  title="ชุดแนะนำสำหรับ 12 คน (ชุดเต็มครบทุกบทบาท)"
+                >
+                  ⚡ 12 คน
+                </button>
+              </div>
 
               <button
                 onClick={handleStartGame}
@@ -1183,7 +1287,7 @@ function WerewolfGame({ setCurrentPage }) {
                 className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-white" />
-                <span>สุ่มแจกบทบาท & เริ่มเกม!</span>
+                <span>เริ่มเกม ({currentTotalAssigned} คน)!</span>
               </button>
             </div>
           </div>
@@ -1237,7 +1341,7 @@ function WerewolfGame({ setCurrentPage }) {
 
                       <button
                         onClick={() => handleIncrease(role.id)}
-                        disabled={currentTotalAssigned >= totalPlayers}
+                        disabled={currentTotalAssigned >= MAX_PLAYERS}
                         className="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -1473,7 +1577,7 @@ function WerewolfGame({ setCurrentPage }) {
                       }`}
                     >
                       <Users className="w-3.5 h-3.5" />
-                      <span>ผังผู้เล่น (12 คน)</span>
+                      <span>ผังผู้เล่น ({roster.length} คน)</span>
                     </button>
 
                     <button
@@ -1497,7 +1601,7 @@ function WerewolfGame({ setCurrentPage }) {
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-indigo-400" />
                     <h4 className="font-bold text-xs sm:text-sm text-white">
-                      ผู้เล่นในหมู่บ้าน (12 คน) —{' '}
+                      ผู้เล่นในหมู่บ้าน ({roster.length} คน) —{' '}
                       {isUserNightActor && !hasActedTonight ? (
                         <span className="text-amber-400 animate-pulse">
                           คลิกเลือกผู้เล่นเพื่อใช้พลังพิเศษ 🎯

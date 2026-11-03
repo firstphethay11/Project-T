@@ -26,6 +26,9 @@ services:
       DB_NAME: project_t_db
     ports:
       - "5001:5001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
     depends_on:
       - project_t_mysql
 
@@ -35,6 +38,9 @@ services:
     restart: unless-stopped
     ports:
       - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - project_t_backend
 
