@@ -1,0 +1,13 @@
+{
+  "name": "project-t-root",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"FRONTEND,BACKEND\" -c \"cyan,green\" \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
+    "frontend": "npm --prefix frontend run dev",
+    "backend": "npm --prefix backend run dev",
+    "install-all": "npm install && npm --prefix frontend install && npm --prefix backend install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
