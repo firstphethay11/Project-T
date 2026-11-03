@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import Navbar from './components/Navbar'
-import Aside from './components/aside'
+import Aside from './components/Aside'
 import Footer from './components/Footer'
-import Homepage from './pages/Homepage'
+import HomePage from './pages/HomePage'
 import AboutPage from './pages/AboutPage'
 
 function App() {
@@ -21,7 +21,7 @@ function App() {
         <div className="flex-1 flex flex-col">
           {/* ส่วนเนื้อหาหลักที่สลับตามปุ่มที่กด */}
           <main className="flex-grow max-w-4xl w-full mx-auto px-6 py-8">
-            {currentPage === 'home' && <Homepage setCurrentPage={setCurrentPage} />}
+            {currentPage === 'home' && <HomePage setCurrentPage={setCurrentPage} />}
             {currentPage === 'about' && <AboutPage />}
           </main>
 
