@@ -10,6 +10,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  Map,
 } from 'lucide-react'
 
 function Aside({ currentPage, setCurrentPage }) {
@@ -18,6 +19,7 @@ function Aside({ currentPage, setCurrentPage }) {
 
   const menuItems = [
     { id: 'home', label: 'หน้าแรก (Home)', icon: Home },
+    { id: 'map', label: 'แผนที่ประเทศไทย (Map)', icon: Map },
     { id: 'about', label: 'สมาชิกในทีม (About)', icon: Users },
     { id: 'game', label: 'เกมเศรษฐี (Game)', icon: Gamepad2 },
     { id: 'werewolf', label: 'เกมแวร์วูล์ฟ (Werewolf)', icon: Moon },

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.4",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.66.0",
     "project-t": "file:",
     "react": "^19.3.1",

@@ -9,9 +9,10 @@ import Game from './pages/Game'
 import WerewolfGame from './pages/WerewolfGame'
 import UnoGame from './pages/UnoGame'
 import LoginPage from './pages/LoginPage'
+import MapPage from './pages/MapPage'
 
 function App() {
-  // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'about', 'guide', 'game', 'werewolf', 'uno', หรือ 'login')
+  // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'map', 'about', 'guide', 'game', 'werewolf', 'uno', หรือ 'login')
   const [currentPage, setCurrentPage] = useState('home')
   // เก็บข้อมูลผู้ใช้ที่ Login สำเร็จจาก MySQL
   const [currentUser, setCurrentUser] = useState(null)
@@ -27,7 +28,8 @@ function App() {
     )
   }
 
-  const isGameView = currentPage === 'game' || currentPage === 'werewolf' || currentPage === 'uno'
+  const isGameView =
+    currentPage === 'game' || currentPage === 'werewolf' || currentPage === 'uno'
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
@@ -51,10 +53,13 @@ function App() {
                 ? 'max-w-7xl px-3 sm:px-6 py-4 flex flex-col justify-center'
                 : isGameView
                 ? 'max-w-5xl px-4 py-3 flex flex-col justify-center'
+                : currentPage === 'map'
+                ? 'max-w-6xl px-4 py-4'
                 : 'max-w-4xl px-6 py-8'
             }`}
           >
             {currentPage === 'home' && <HomePage setCurrentPage={setCurrentPage} />}
+            {currentPage === 'map' && <MapPage />}
             {currentPage === 'about' && <AboutPage />}
             {currentPage === 'guide' && <GuidePage setCurrentPage={setCurrentPage} />}
             {currentPage === 'game' && <Game setCurrentPage={setCurrentPage} />}
