@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   KeyRound,
   User,
-  Briefcase,
   RefreshCw,
   ArrowLeft,
   GitBranch,
@@ -21,11 +20,9 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
   // สลับโหมด 'login' หรือ 'register'
   const [mode, setMode] = useState('login')
 
-  // ข้อมูลฟอร์ม
+  // ข้อมูลฟอร์ม (ใช้เพียงชื่อผู้ใช้และรหัสผ่าน)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState('Frontend Developer')
 
   // สถานะแจ้งผลลัพธ์
   const [errorMsg, setErrorMsg] = useState('')
@@ -59,10 +56,7 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
 
     try {
       const endpoint = mode === 'login' ? '/api/login' : '/api/register'
-      const payload =
-        mode === 'login'
-          ? { username, password }
-          : { username, password, full_name: fullName, role }
+      const payload = { username, password }
 
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
@@ -79,12 +73,11 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
         setCurrentUser(data.user)
         setUsername('')
         setPassword('')
-        setFullName('')
         fetchUsers()
       }
     } catch {
       setErrorMsg(
-        'ไม่สามารถเชื่อมต่อ Backend (พอร์ต 5001) ได้ กรุณาตรวจสอบว่า npm run dev รันอยู่'
+        'ไม่สามารถเชื่อมต่อ Backend (พอร์ต 5001) ได้ กรุณาตรวจสอบว่า npm run dev หรือ Docker รันอยู่'
       )
     } finally {
       setLoading(false)
@@ -118,7 +111,7 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
       {/* ส่วนเนื้อหาฟอร์มตรงกลาง */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 pb-12">
         <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* ฝั่งซ้าย: ฟอร์ม Login / Register */}
+          {/* ฝั่งซ้าย: ฟอร์ม Login / Register (มีแค่ Username และ Password) */}
           <div className="lg:col-span-3 bg-white text-gray-800 rounded-3xl shadow-2xl p-6 sm:p-8 border border-white/10">
             {/* สลับปุ่ม Login / Register */}
             <div className="flex bg-gray-100 p-1.5 rounded-2xl mb-6">
@@ -166,9 +159,13 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-emerald-950">
-                      เข้าสู่ระบบในชื่อ: {currentUser.full_name} (@{currentUser.username})
+                      เข้าสู่ระบบในชื่อ: @{currentUser.username}
                     </p>
-                    <p className="text-xs text-emerald-700">ตำแหน่ง: {currentUser.role}</p>
+                    <p className="text-xs text-emerald-700">
+                      {currentUser.full_name && currentUser.full_name !== currentUser.username
+                        ? currentUser.full_name
+                        : 'สมาชิกในระบบ'}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -195,18 +192,18 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
               </div>
             )}
 
-            {/* ฟอร์มกรอกข้อมูล */}
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {/* ฟอร์มกรอกข้อมูล - มีเฉพาะ Username และ Password */}
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   ชื่อผู้ใช้ (Username)
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                  <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                   <input
                     type="text"
                     required
-                    placeholder="เช่น member1"
+                    placeholder="เช่น member1 หรือชื่อของคุณ"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -219,7 +216,7 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
                   รหัสผ่าน (Password)
                 </label>
                 <div className="relative">
-                  <KeyRound className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                  <KeyRound className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                   <input
                     type="password"
                     required
@@ -231,44 +228,10 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
                 </div>
               </div>
 
-              {mode === 'register' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      ชื่อ-นามสกุล (Full Name)
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="เช่น สมชาย ใจดี"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      ตำแหน่งในทีม (Role)
-                    </label>
-                    <div className="relative">
-                      <Briefcase className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                      <input
-                        type="text"
-                        placeholder="เช่น Frontend Developer"
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full py-3 rounded-xl text-white font-semibold text-sm shadow-md transition cursor-pointer ${
+                className={`w-full py-3 rounded-xl text-white font-semibold text-sm shadow-md transition cursor-pointer mt-2 ${
                   mode === 'login'
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500'
                     : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
@@ -277,8 +240,8 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
                 {loading
                   ? 'กำลังประมวลผล...'
                   : mode === 'login'
-                  ? 'เข้าสู่ระบบด้วย MySQL'
-                  : 'บันทึกข้อมูลลง MySQL'}
+                  ? 'เข้าสู่ระบบ (Login)'
+                  : 'ยืนยันการสมัครสมาชิก (Register)'}
               </button>
             </form>
           </div>
@@ -321,12 +284,13 @@ function LoginPage({ currentUser, setCurrentUser, setCurrentPage }) {
                     className="p-3.5 rounded-2xl border border-white/10 bg-slate-900/50 hover:bg-blue-500/10 hover:border-blue-400/50 transition cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-slate-200">{u.full_name}</span>
+                      <span className="font-bold text-sm text-slate-200">
+                        {u.full_name || u.username}
+                      </span>
                       <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30">
                         @{u.username}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">{u.role}</p>
                   </div>
                 ))}
               </div>

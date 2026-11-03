@@ -65,18 +65,21 @@ app.post('/api/login', async (req, res) => {
   }
 })
 
-// API สำหรับสมัครสมาชิกใหม่ (Register)
+// API สำหรับสมัครสมาชิกใหม่ (Register) - ใช้แค่ username และ password
 app.post('/api/register', async (req, res) => {
   const { username, password, full_name, role } = req.body
 
-  if (!username || !password || !full_name) {
-    return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' })
+  if (!username || !password) {
+    return res.status(400).json({ error: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' })
   }
 
   try {
+    const nameToSave = full_name || username
+    const roleToSave = role || 'Member'
+
     const [result] = await pool.query(
       'INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)',
-      [username, password, full_name, role || 'Member']
+      [username, password, nameToSave, roleToSave]
     )
 
     res.status(201).json({
@@ -84,8 +87,8 @@ app.post('/api/register', async (req, res) => {
       user: {
         id: result.insertId,
         username,
-        full_name,
-        role: role || 'Member',
+        full_name: nameToSave,
+        role: roleToSave,
       },
     })
   } catch (err) {
