@@ -47,7 +47,7 @@ function App() {
           <main
             className={`flex-grow w-full mx-auto ${
               isGameView
-                ? 'max-w-5xl px-4 py-3 flex flex-col justify-center'
+                ? 'max-w-[1480px] px-2 sm:px-4 py-2 sm:py-3 flex flex-col justify-center'
                 : 'max-w-4xl px-6 py-8'
             }`}
           >
