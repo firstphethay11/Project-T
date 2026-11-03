@@ -3,18 +3,19 @@ import cors from 'cors'
 import mysql from 'mysql2/promise'
 
 const app = express()
-const PORT = 5001
+const PORT = process.env.PORT || 5001
 
 app.use(cors())
 app.use(express.json())
 
-// ตั้งค่าการเชื่อมต่อ MySQL ของ Project-T (พอร์ต 3307)
+// ตั้งค่าการเชื่อมต่อ MySQL ของ Project-T
+// รองรับทั้งรันข้างนอก Docker (localhost:3307) และรันข้างใน Docker (project_t_mysql:3306)
 const pool = mysql.createPool({
-  host: 'localhost',
-  port: 3307,
-  user: 'root',
-  password: '1234',
-  database: 'project_t_db',
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3307,
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '1234',
+  database: process.env.DB_NAME || 'project_t_db',
   charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 10,
@@ -22,7 +23,7 @@ const pool = mysql.createPool({
 
 // หน้าแรกของ API เช็กว่าเซิร์ฟเวอร์ทำงานไหม
 app.get('/', (req, res) => {
-  res.json({ message: 'Backend API ของ Project-T (MySQL Port 3307) ทำงานปกติครับ!' })
+  res.json({ message: 'Backend API ของ Project-T ทำงานปกติครับ!' })
 })
 
 // API ดึงรายชื่อผู้ใช้ทั้งหมดจากตาราง users
