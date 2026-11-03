@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Dices,
   Coins,
@@ -76,19 +76,20 @@ function Game() {
   const [money, setMoney] = useState(20000)
   const [ownedTiles, setOwnedTiles] = useState([]) // รหัสช่องที่ซื้อแล้ว
 
-  // สถานะลูกเต๋า (ลูกเต๋าคู่ 2 ลูก)
+  // สถานะลูกเต๋า
   const [dice1, setDice1] = useState(1)
   const [dice2, setDice2] = useState(1)
   const [isRolling, setIsRolling] = useState(false)
+  const [isMoving, setIsMoving] = useState(false) // สถานะกำลังเดินทีละช่อง
 
   // ประวัติการเล่น
   const [logs, setLogs] = useState([
     'ยินดีต้อนรับสู่เกมเศรษฐี 40 ช่อง (11x11 Grid)! ทอยเต๋าเพื่อเริ่มเล่น',
   ])
 
-  // ฟังก์ชันทอยลูกเต๋า 2 ลูก
+  // ฟังก์ชันทอยลูกเต๋า
   const handleRollDice = () => {
-    if (isRolling) return
+    if (isRolling || isMoving) return
     setIsRolling(true)
 
     let count = 0
@@ -103,54 +104,76 @@ function Game() {
         setDice1(d1)
         setDice2(d2)
         setIsRolling(false)
-        movePlayer(d1 + d2)
+
+        // เริ่มอนิเมชันเดินทีละช่องตามผลรวมลูกเต๋า
+        animateWalking(d1 + d2)
       }
     }, 70)
   }
 
-  // คำนวณการเดิน
-  const movePlayer = (steps) => {
-    const nextPos = (playerPos + steps) % INITIAL_TILES.length
-    const passedStart = playerPos + steps >= INITIAL_TILES.length
-    const currentTile = INITIAL_TILES[nextPos]
+  // อนิเมชันเดินทีละช่อง (Step by Step)
+  const animateWalking = (totalSteps) => {
+    setIsMoving(true)
+    let currentStep = 0
+    let currentPos = playerPos
 
-    setPlayerPos(nextPos)
+    const walkInterval = setInterval(() => {
+      currentStep++
+      currentPos = (currentPos + 1) % INITIAL_TILES.length
+      setPlayerPos(currentPos)
 
-    let newMoney = money
-    if (passedStart && nextPos !== 0) {
-      newMoney += 2000
-      addLog(`🚩 เดินผ่านจุดเริ่มต้น รับโบนัส ฿2,000`)
-    }
+      // ถ้าเดินผ่านจุดเริ่มต้น (ช่อง 0) ระหว่างทาง รับโบนัส ฿2,000 ทันที
+      if (currentPos === 0) {
+        setMoney((prev) => prev + 2000)
+        addLog('🚩 เดินผ่านจุดเริ่มต้น รับเงินโบนัส ฿2,000!')
+      }
+
+      // เดินครบตามจำนวนก้าวแล้ว
+      if (currentStep >= totalSteps) {
+        clearInterval(walkInterval)
+        setIsMoving(false)
+
+        // ตรวจสอบเหตุการณ์ช่องปลายทางที่หยุด
+        handleLanding(currentPos)
+      }
+    }, 220) // ขยับช่องละ 220 มิลลิวินาที (ก้าวกำลังสวยงาม)
+  }
+
+  // ตรวจสอบเหตุการณ์เมื่อเดินถึงช่องปลายทาง
+  const handleLanding = (finalPos) => {
+    const currentTile = INITIAL_TILES[finalPos]
 
     if (currentTile.type === 'start') {
-      newMoney += 2000
-      addLog(`🚩 ตกที่จุดเริ่มต้น รับเงิน ฿2,000!`)
+      addLog(`🚩 หยุดที่จุดเริ่มต้น รับเงินรอบใหม่!`)
     } else if (currentTile.type === 'tax') {
-      newMoney = Math.max(0, newMoney - currentTile.price)
-      addLog(`💸 เสียภาษี จ่ายเงิน ฿${currentTile.price}`)
+      setMoney((prev) => Math.max(0, prev - currentTile.price))
+      addLog(`💸 เสียภาษี จ่ายเงิน ฿${currentTile.price.toLocaleString()}`)
     } else if (currentTile.type === 'gotojail') {
-      setPlayerPos(10)
-      addLog(`🚨 ตำรวจจับส่งเข้าเรือนจำ!`)
+      addLog(`🚨 ตำรวจจับกุม! กำลังนำตัวส่งเรือนจำ...`)
+      setTimeout(() => {
+        setPlayerPos(10) // ส่งไปช่องเรือนจำ
+        addLog(`⛓️ คุณถูกส่งตัวเข้าเรือนจำแล้ว`)
+      }, 600)
     } else if (currentTile.type === 'chance') {
       const reward = Math.random() > 0.5 ? 1200 : -600
-      newMoney = Math.max(0, newMoney + reward)
+      setMoney((prev) => Math.max(0, prev + reward))
       addLog(
         reward > 0
-          ? `🎁 เปิดการ์ดโชคดี ได้รับ ฿${reward}!`
+          ? `🎁 เปิดการ์ดโชคดี ได้รับรางวัล ฿${reward}!`
           : `⚡ เปิดการ์ดโชคร้าย เสียค่าปรับ ฿${Math.abs(reward)}`
       )
     } else if (['property', 'transport', 'utility'].includes(currentTile.type)) {
-      const isOwned = ownedTiles.includes(currentTile.id)
-      if (isOwned) {
-        addLog(`🏠 ตกช่องของคุณ: ${currentTile.name}`)
-      } else {
-        addLog(`🏙️ ตกที่ดินว่าง: ${currentTile.name} (฿${currentTile.price.toLocaleString()})`)
-      }
+      setOwnedTiles((prevOwned) => {
+        if (prevOwned.includes(currentTile.id)) {
+          addLog(`🏠 ตกช่องเมืองของคุณ: ${currentTile.name}`)
+        } else {
+          addLog(`🏙️ ตกที่ดินว่าง: ${currentTile.name} (ราคา ฿${currentTile.price.toLocaleString()})`)
+        }
+        return prevOwned
+      })
     } else {
-      addLog(`🌴 ตกที่ ${currentTile.name}`)
+      addLog(`🌴 แวะพักผ่อนที่ ${currentTile.name}`)
     }
-
-    setMoney(newMoney)
   }
 
   // ซื้อที่ดิน
@@ -171,6 +194,7 @@ function Game() {
 
   // รีเซ็ตเกม
   const handleReset = () => {
+    if (isRolling || isMoving) return
     setPlayerPos(0)
     setMoney(20000)
     setOwnedTiles([])
@@ -181,6 +205,8 @@ function Game() {
 
   const currentLandingTile = INITIAL_TILES[playerPos]
   const canBuyCurrent =
+    !isMoving &&
+    !isRolling &&
     ['property', 'transport', 'utility'].includes(currentLandingTile.type) &&
     !ownedTiles.includes(currentLandingTile.id) &&
     money >= currentLandingTile.price
@@ -200,6 +226,11 @@ function Game() {
           <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 rounded-full">
             11 × 11 (40 ช่อง)
           </span>
+          {isMoving && (
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded-full animate-pulse">
+              กำลังเดิน... 🏃
+            </span>
+          )}
         </div>
 
         {/* แถบสรุปสถานะแนวนอน */}
@@ -223,7 +254,8 @@ function Game() {
         {/* ปุ่มเริ่มใหม่ */}
         <button
           onClick={handleReset}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition cursor-pointer"
+          disabled={isRolling || isMoving}
+          className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 disabled:opacity-40 rounded-lg transition cursor-pointer"
           title="เริ่มเกมใหม่"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -252,9 +284,9 @@ function Game() {
                 key={tile.id}
                 className={`${tile.gridPos} ${
                   isCorner ? 'bg-amber-100' : 'bg-amber-50'
-                } rounded-xs sm:rounded-sm p-0.5 flex flex-col justify-between border transition-all relative overflow-hidden select-none ${
+                } rounded-xs sm:rounded-sm p-0.5 flex flex-col justify-between border transition-all duration-150 relative overflow-hidden select-none ${
                   isPlayerHere
-                    ? 'border-red-500 ring-2 sm:ring-3 ring-red-400/60 shadow-md scale-[1.05] z-30'
+                    ? 'border-red-500 ring-2 sm:ring-4 ring-yellow-400 shadow-xl scale-[1.08] z-30 bg-amber-100'
                     : isOwned
                     ? 'border-blue-500 bg-blue-50/70'
                     : 'border-amber-200/70'
@@ -288,11 +320,15 @@ function Game() {
                   )}
                 </div>
 
-                {/* ตัวเดินของผู้เล่น */}
+                {/* ตัวเดินของผู้เล่น (มีเอฟเฟกต์กระโดดก้าวเดิน) */}
                 {isPlayerHere && (
                   <div className="absolute inset-0 flex items-center justify-center bg-red-500/25 backdrop-blur-[0.5px]">
-                    <div className="bg-red-600 text-white p-0.5 rounded-full shadow-md animate-bounce">
-                      <UserRound className="w-3 h-3 sm:w-4 sm:h-4 stroke-[2.5]" />
+                    <div
+                      className={`bg-red-600 text-white p-0.5 rounded-full shadow-lg ${
+                        isMoving ? 'scale-125 ring-2 ring-yellow-300' : 'animate-bounce'
+                      } transition-transform duration-100`}
+                    >
+                      <UserRound className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
                     </div>
                   </div>
                 )}
@@ -339,12 +375,16 @@ function Game() {
                 {/* ปุ่มทอยเต๋า */}
                 <button
                   onClick={handleRollDice}
-                  disabled={isRolling}
+                  disabled={isRolling || isMoving}
                   className="flex items-center gap-1.5 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs sm:text-sm shadow-md hover:shadow-amber-500/30 transition transform active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   <Dices className={`w-4 h-4 ${isRolling ? 'animate-spin' : ''}`} />
                   <span>
-                    {isRolling ? 'กำลังทอย...' : `ทอยเต๋า (${dice1 + dice2} แต้ม)`}
+                    {isRolling
+                      ? 'กำลังทอย...'
+                      : isMoving
+                      ? 'กำลังเดิน... 🏃'
+                      : `ทอยเต๋า (${dice1 + dice2} แต้ม)`}
                   </span>
                 </button>
               </div>
