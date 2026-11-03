@@ -6,15 +6,23 @@ import HomePage from './pages/HomePage'
 import AboutPage from './pages/AboutPage'
 import GuidePage from './pages/GuidePage'
 import Game from './pages/Game'
+import LoginPage from './pages/LoginPage'
 
 function App() {
-  // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'about', 'guide', หรือ 'game')
+  // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'about', 'guide', 'game', หรือ 'login')
   const [currentPage, setCurrentPage] = useState('home')
+  // เก็บข้อมูลผู้ใช้ที่ Login สำเร็จจาก MySQL
+  const [currentUser, setCurrentUser] = useState(null)
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
       {/* ส่วนแถบเมนูด้านบน */}
-      <Navbar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      <Navbar
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+      />
 
       {/* ส่วนกลาง: แบ่งเป็น Aside ด้านซ้าย และ เนื้อหาหลักด้านขวา */}
       <div className="flex flex-1 min-h-0">
@@ -33,6 +41,13 @@ function App() {
             {currentPage === 'about' && <AboutPage />}
             {currentPage === 'guide' && <GuidePage setCurrentPage={setCurrentPage} />}
             {currentPage === 'game' && <Game />}
+            {currentPage === 'login' && (
+              <LoginPage
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+                setCurrentPage={setCurrentPage}
+              />
+            )}
           </main>
 
           {/* ส่วนท้ายเว็บ - ซ่อนในหน้าเกมเพื่อให้แสดงผลเต็มหน้าจอ 1 หน้าพอดี */}

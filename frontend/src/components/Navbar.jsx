@@ -1,6 +1,6 @@
-import { GitBranch, Sparkles, BookOpen, ExternalLink } from 'lucide-react'
+import { GitBranch, Sparkles, BookOpen, LogIn, LogOut, UserCheck } from 'lucide-react'
 
-function Navbar({ currentPage, setCurrentPage }) {
+function Navbar({ currentPage, setCurrentPage, currentUser, setCurrentUser }) {
   return (
     <header className="sticky top-0 z-40 h-16 bg-white/85 backdrop-blur-md border-b border-gray-200/80 shadow-xs flex items-center">
       <div className="max-w-7xl w-full mx-auto px-6 flex items-center justify-between">
@@ -23,34 +23,55 @@ function Navbar({ currentPage, setCurrentPage }) {
               </span>
             </div>
             <p className="text-[11px] text-gray-400 hidden sm:block">
-              React • Vite • Tailwind CSS
+              React • Vite • Tailwind CSS • MySQL
             </p>
           </div>
         </div>
 
-        {/* ด้านขวา: ปุ่มเปิดหน้าแนะนำคู่มือ Git (ไม่ซ้ำกับ Aside ด้านซ้าย) */}
+        {/* ด้านขวา: ปุ่มหน้าแนะนำ + ระบบ Login */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setCurrentPage('guide')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer border ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer border ${
               currentPage === 'guide'
                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md shadow-blue-500/25'
                 : 'bg-blue-50/70 text-blue-700 border-blue-200/80 hover:bg-blue-100/80'
             }`}
           >
             <BookOpen className="w-4 h-4" />
-            <span>หน้าแนะนำ (Git Guide)</span>
+            <span className="hidden sm:inline">หน้าแนะนำ (Git Guide)</span>
           </button>
 
-          <a
-            href="https://github.com/firstphethay11/Project-T"
-            target="_blank"
-            rel="noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200/80 transition"
-          >
-            <span>GitHub Repo</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage('login')}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold cursor-pointer"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>{currentUser.full_name}</span>
+              </button>
+              <button
+                onClick={() => setCurrentUser(null)}
+                title="ออกจากระบบ"
+                className="p-2 rounded-xl text-gray-500 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setCurrentPage('login')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                currentPage === 'login'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25'
+                  : 'bg-gray-900 text-white hover:bg-gray-800'
+              }`}
+            >
+              <LogIn className="w-4 h-4" />
+              <span>เข้าสู่ระบบ</span>
+            </button>
+          )}
         </div>
       </div>
     </header>
