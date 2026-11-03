@@ -4,9 +4,10 @@ import Aside from './components/Aside'
 import Footer from './components/Footer'
 import HomePage from './pages/HomePage'
 import AboutPage from './pages/AboutPage'
+import GuidePage from './pages/GuidePage'
 
 function App() {
-  // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home' หรือ 'about')
+  // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'about', หรือ 'guide')
   const [currentPage, setCurrentPage] = useState('home')
 
   return (
@@ -23,6 +24,7 @@ function App() {
           <main className="flex-grow max-w-4xl w-full mx-auto px-6 py-8">
             {currentPage === 'home' && <HomePage setCurrentPage={setCurrentPage} />}
             {currentPage === 'about' && <AboutPage />}
+            {currentPage === 'guide' && <GuidePage setCurrentPage={setCurrentPage} />}
           </main>
 
           {/* ส่วนท้ายเว็บ */}

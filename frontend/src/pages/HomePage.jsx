@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Pin, Palette, Sparkles, Rocket, Check, ArrowRight } from 'lucide-react'
 import realisticHero from '../assets/realistic-hero.jpg'
 
 function Homepage({ setCurrentPage }) {
@@ -159,9 +160,7 @@ function Homepage({ setCurrentPage }) {
                 className="group bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-medium px-7 py-3.5 rounded-xl shadow-lg shadow-blue-600/40 hover:shadow-blue-500/60 transition-all duration-300 active:scale-95 cursor-pointer flex items-center gap-3 border border-white/20"
               >
                 <span>ดูข้อมูลสมาชิกในทีม</span>
-                <span className="text-lg transition-transform duration-300 group-hover:translate-x-1.5">
-                  →
-                </span>
+                <ArrowRight className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1.5" />
               </button>
 
               <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300 bg-slate-900/60 backdrop-blur-sm px-4 py-3 rounded-xl border border-white/10">
@@ -188,7 +187,7 @@ function Homepage({ setCurrentPage }) {
             </div>
 
             <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="text-blue-600">📌</span>
+              <Pin className="w-5 h-5 text-blue-600 shrink-0" />
               <span>โจทย์ของคนที่ 1</span>
             </h2>
 
@@ -231,7 +230,7 @@ function Homepage({ setCurrentPage }) {
                         : 'border-gray-300 bg-white'
                     }`}
                   >
-                    {task.done && <span className="text-[10px] font-bold">✓</span>}
+                    {task.done && <Check className="w-3 h-3 stroke-[3]" />}
                   </div>
                   <span className={task.done ? 'font-medium' : ''}>
                     {task.text}
@@ -243,9 +242,16 @@ function Homepage({ setCurrentPage }) {
 
           <div className="text-xs text-gray-400 pt-3 border-t border-gray-100 flex items-center justify-between">
             <span>ไฟล์: src/pages/Homepage.jsx</span>
-            <span className="text-emerald-600 font-semibold flex items-center gap-1">
+            <span className="text-emerald-600 font-semibold flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              {progress1 === 100 ? 'สมบูรณ์แบบ ✨' : 'กำลังดำเนินการ'}
+              {progress1 === 100 ? (
+                <>
+                  <span>สมบูรณ์แบบ</span>
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                </>
+              ) : (
+                <span>กำลังดำเนินการ</span>
+              )}
             </span>
           </div>
         </div>
@@ -263,7 +269,7 @@ function Homepage({ setCurrentPage }) {
             </div>
 
             <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="text-emerald-600">🎨</span>
+              <Palette className="w-5 h-5 text-emerald-600 shrink-0" />
               <span>โจทย์ของคนที่ 2</span>
             </h2>
 
@@ -306,7 +312,7 @@ function Homepage({ setCurrentPage }) {
                         : 'border-gray-300 bg-white'
                     }`}
                   >
-                    {task.done && <span className="text-[10px] font-bold">✓</span>}
+                    {task.done && <Check className="w-3 h-3 stroke-[3]" />}
                   </div>
                   <span className={task.done ? 'font-medium' : ''}>
                     {task.text}
@@ -318,9 +324,10 @@ function Homepage({ setCurrentPage }) {
 
           <div className="text-xs text-gray-400 pt-3 border-t border-gray-100 flex items-center justify-between">
             <span>ไฟล์: src/pages/AboutPage.jsx</span>
-            <span className="text-amber-600 font-semibold flex items-center gap-1">
+            <span className="text-amber-600 font-semibold flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-              รอส่ง Pull Request 🚀
+              <span>รอส่ง Pull Request</span>
+              <Rocket className="w-3.5 h-3.5 text-amber-500" />
             </span>
           </div>
         </div>
