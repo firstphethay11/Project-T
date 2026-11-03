@@ -84,8 +84,10 @@ function UnoGame({ setCurrentPage }) {
   const [currentColor, setCurrentColor] = useState('red')
   const [currentTurnId, setCurrentTurnId] = useState('player')
   const [direction, setDirection] = useState(1) // 1 = ตามเข็มนาฬิกา, -1 = ทวนเข็มนาฬิกา
-  const [gameStatus, setGameStatus] = useState('playing') // 'playing' | 'player_win' | 'bot_win'
-  const [winnerName, setWinnerName] = useState('')
+  const [gameStatus, setGameStatus] = useState('playing') // 'playing' | 'game_over'
+  // ลำดับการจบเกม (ตารางอันดับ Leaderboard):
+  // [{ id, name, rank, isUser, avatar, isLoser }]
+  const [finishedRankings, setFinishedRankings] = useState([])
 
   // การเลือกลงไพ่ (สามารถเลือกลงได้สูงสุด 2 ใบ)
   const [selectedCardIds, setSelectedCardIds] = useState([])
@@ -106,7 +108,7 @@ function UnoGame({ setCurrentPage }) {
   }
 
   // รายชื่อผู้เล่นทั้งหมดในเกมปัจจุบัน (ผู้เล่น + บอท 1..botCount)
-  const activePlayers = [
+  const allPlayers = [
     { id: 'player', name: 'คุณ (ผู้เล่น)', isUser: true, avatar: '👤' },
     ...BOT_PROFILES.slice(0, botCount).map((b) => ({
       id: b.id,
@@ -118,12 +120,35 @@ function UnoGame({ setCurrentPage }) {
     })),
   ]
 
-  // คำนวณผู้เล่นคนถัดไปตามทิศทาง
-  const getNextPlayerId = (currentId, step = 1, customDir = direction) => {
-    const idx = activePlayers.findIndex((p) => p.id === currentId)
-    if (idx === -1) return activePlayers[0].id
-    const nextIdx = (idx + step * customDir + activePlayers.length * 10) % activePlayers.length
-    return activePlayers[nextIdx].id
+  // รายชื่อผู้เล่นที่ยังคงแข่งขันอยู่บนโต๊ะ (ยังไม่ทิ้งไพ่จนหมด)
+  const activePlayers = allPlayers.filter((p) => !finishedRankings.some((r) => r.id === p.id))
+
+  // คำนวณผู้เล่นคนถัดไปตามทิศทาง โดยข้ามผู้เล่นที่ทิ้งไพ่หมดมือไปแล้ว
+  const getNextActivePlayerId = (
+    fromId,
+    stepCount = 1,
+    customDir = direction,
+    currentFinished = finishedRankings
+  ) => {
+    const active = allPlayers.filter((p) => !currentFinished.some((r) => r.id === p.id))
+    if (active.length <= 1) return active[0]?.id || null
+
+    let currentIdx = allPlayers.findIndex((p) => p.id === fromId)
+    if (currentIdx === -1) currentIdx = 0
+
+    let stepsFound = 0
+    let searchIdx = currentIdx
+    const total = allPlayers.length
+
+    while (stepsFound < stepCount) {
+      searchIdx = (searchIdx + customDir + total * 100) % total
+      const candidate = allPlayers[searchIdx]
+      if (!currentFinished.some((r) => r.id === candidate.id)) {
+        stepsFound++
+      }
+    }
+
+    return allPlayers[searchIdx].id
   }
 
   // เริ่มเกมใหม่ แจกไพ่คนละ 7 ใบ
@@ -157,6 +182,7 @@ function UnoGame({ setCurrentPage }) {
     setCurrentTurnId('player')
     setDirection(1)
     setGameStatus('playing')
+    setFinishedRankings([])
     setSelectedCardIds([])
     setHasDrawnThisTurn(false)
     setColorPickerOpen(false)
@@ -310,11 +336,47 @@ function UnoGame({ setCurrentPage }) {
       )
     }
 
-    // ตรวจสอบผู้ชนะ
+    // ตรวจสอบผู้เล่นที่ทิ้งไพ่จนหมดมือ
     if (nextHand.length === 0) {
-      setGameStatus(isUser ? 'player_win' : 'bot_win')
-      setWinnerName(whoName)
-      addLog(`🏆 ${whoName} ทิ้งไพ่จนหมดมือ คว้าชัยชนะในเกม UNO!`)
+      const newRank = finishedRankings.length + 1
+      const pProfile = allPlayers.find((p) => p.id === whoId)
+      const finishedEntry = {
+        id: whoId,
+        name: whoName,
+        rank: newRank,
+        isUser,
+        avatar: pProfile?.avatar || (isUser ? '👤' : '🤖'),
+      }
+      const updatedFinished = [...finishedRankings, finishedEntry]
+      setFinishedRankings(updatedFinished)
+
+      const remainingPlayers = allPlayers.filter((p) => !updatedFinished.some((r) => r.id === p.id))
+
+      // หากเหลือผู้เล่นคนสุดท้ายเพียงคนเดียว -> จบเกมทันทีและบันทึกผู้แพ้คนสุดท้าย!
+      if (remainingPlayers.length <= 1) {
+        if (remainingPlayers.length === 1) {
+          const loser = remainingPlayers[0]
+          const loserEntry = {
+            id: loser.id,
+            name: loser.name,
+            rank: updatedFinished.length + 1,
+            isUser: loser.isUser,
+            avatar: loser.avatar,
+            isLoser: true,
+          }
+          setFinishedRankings([...updatedFinished, loserEntry])
+          addLog(`💀 ${loser.name} เหลือไพ่ในมือเป็นคนสุดท้าย จึงเป็นผู้แพ้ในเกมนี้!`)
+        }
+        setGameStatus('game_over')
+        addLog(`🏆 ${whoName} ทิ้งไพ่หมดมือ คว้าอันดับที่ ${newRank}!`)
+        return
+      }
+
+      // หากยังเหลือผู้เล่นมากกว่า 1 คน -> แข่งขันต่อจนกว่าจะเหลือคนสุดท้าย!
+      addLog(`🎉 ${whoName} ทิ้งไพ่หมดมือ คว้าอันดับที่ ${newRank}! 🏆 (เหลืออีก ${remainingPlayers.length} คน แข่งต่อจนกว่าจะเหลือคนสุดท้าย)`)
+
+      // คำนวณเอฟเฟกต์การ์ดที่เพิ่งลง และส่งต่อให้ผู้เล่นที่ยังอยู่บนโต๊ะ
+      applyCombinedCardEffects(cards, whoId, chosenColor, updatedFinished)
       return
     }
 
@@ -329,7 +391,7 @@ function UnoGame({ setCurrentPage }) {
   }
 
   // คำนวณเอฟเฟกต์การ์ดพิเศษ: Skip, Reverse, +2, +4
-  const applyCombinedCardEffects = (cards, whoId) => {
+  const applyCombinedCardEffects = (cards, whoId, chosenColor, currentFinished = finishedRankings) => {
     setHasDrawnThisTurn(false)
     let totalDrawPenalty = 0
     let skipCount = 0
@@ -343,43 +405,44 @@ function UnoGame({ setCurrentPage }) {
     })
 
     let currentDir = direction
+    const remainingActive = allPlayers.filter((p) => !currentFinished.some((r) => r.id === p.id))
 
     // กรณีมีการ์ด Reverse 🔄
     if (reverseCount % 2 === 1) {
       currentDir = direction * -1
       setDirection(currentDir)
-      if (activePlayers.length > 2) {
+      if (remainingActive.length > 2) {
         addLog(`🔄 ทิศทางการเล่นเปลี่ยนเป็น: ${currentDir === 1 ? 'ตามเข็มนาฬิกา ↻' : 'ทวนเข็มนาฬิกา ↺'}`)
       } else {
-        // ในเกม 2 คน Reverse มีผลเหมือนการข้ามตา
+        // ในกรณีเหลือ 2 คน Reverse มีผลเหมือนการข้ามตา
         skipCount++
       }
     }
 
     // กรณีมีโทษจั่ว +2 หรือ +4 -> ซ้อนโทษจั่ว (Stacking) และส่งต่อให้คนถัดไปหลบ
     if (totalDrawPenalty > 0) {
-      const nextVictimId = getNextPlayerId(whoId, 1, currentDir)
-      const nextVictimName = activePlayers.find((p) => p.id === nextVictimId)?.name || nextVictimId
+      const nextVictimId = getNextActivePlayerId(whoId, 1, currentDir, currentFinished)
+      const nextVictimName = allPlayers.find((p) => p.id === nextVictimId)?.name || nextVictimId
       const newStack = drawStack + totalDrawPenalty
       setDrawStack(newStack)
       addLog(`⚡ โทษจั่วสะสมทบเป็น +${newStack} ใบ! ตาของ ${nextVictimName} (เลือกลง +2/+4 เพื่อหลบ หรือจั่วรับโทษ)`)
-      setCurrentTurnId(nextVictimId)
+      if (nextVictimId) setCurrentTurnId(nextVictimId)
       return
     }
 
     // กรณีมีการ์ดข้าม Skip 🚫
     if (skipCount > 0) {
-      const skippedId = getNextPlayerId(whoId, 1, currentDir)
-      const skippedName = activePlayers.find((p) => p.id === skippedId)?.name || skippedId
+      const skippedId = getNextActivePlayerId(whoId, 1, currentDir, currentFinished)
+      const skippedName = allPlayers.find((p) => p.id === skippedId)?.name || skippedId
       addLog(`🚫 ${skippedName} โดนข้ามตาเล่น!`)
-      const nextId = getNextPlayerId(whoId, 1 + skipCount, currentDir)
-      setCurrentTurnId(nextId)
+      const nextId = getNextActivePlayerId(whoId, 1 + skipCount, currentDir, currentFinished)
+      if (nextId) setCurrentTurnId(nextId)
       return
     }
 
     // เทิร์นปกติ เลื่อนไปยังผู้เล่นคนถัดไป 1 ตำแหน่ง
-    const nextPlayerId = getNextPlayerId(whoId, 1, currentDir)
-    setCurrentTurnId(nextPlayerId)
+    const nextPlayerId = getNextActivePlayerId(whoId, 1, currentDir, currentFinished)
+    if (nextPlayerId) setCurrentTurnId(nextPlayerId)
   }
 
   // จั่วการ์ด N ใบให้ผู้เล่นหรือบอท
@@ -409,11 +472,11 @@ function UnoGame({ setCurrentPage }) {
     if (drawStack > 0) {
       drawCardsFor('player', drawStack)
       addLog(`💥 คุณจั่วรับโทษสะสม +${drawStack} ใบเต็มจำนวน! (และเสียตาเล่น)`)
-      const nextId = getNextPlayerId('player', 1)
+      const nextId = getNextActivePlayerId('player', 1)
       setDrawStack(0)
       setHasDrawnThisTurn(false)
       setSelectedCardIds([])
-      setCurrentTurnId(nextId)
+      if (nextId) setCurrentTurnId(nextId)
       return
     }
 
@@ -439,26 +502,33 @@ function UnoGame({ setCurrentPage }) {
     if (currentTurnId !== 'player' || !hasDrawnThisTurn || drawStack > 0) return
     setHasDrawnThisTurn(false)
     setSelectedCardIds([])
-    const nextId = getNextPlayerId('player', 1)
-    const nextName = activePlayers.find((p) => p.id === nextId)?.name || nextId
+    const nextId = getNextActivePlayerId('player', 1)
+    const nextName = allPlayers.find((p) => p.id === nextId)?.name || nextId
     addLog(`คุณผ่านตาไปยัง ${nextName}`)
-    setCurrentTurnId(nextId)
+    if (nextId) setCurrentTurnId(nextId)
   }
 
-  // ระบบการเล่นอัตโนมัติของบอท AI (รองรับบอทหลายตัว, ลงคู่เลขและสีเดียวกัน, และซ้อนหลบไพ่ +2/+4)
+  // ระบบการเล่นอัตโนมัติของบอท AI (รองรับบอทหลายตัว, เล่นจนเหลือคนสุดท้าย, ซ้อนหลบไพ่ +2/+4)
   useEffect(() => {
     if (currentTurnId === 'player' || gameStatus !== 'playing' || gamePhase !== 'playing') return
 
+    // หากผู้เล่นคนนี้จบการแข่งขันไปแล้ว ให้ส่งตาต่อไปยังผู้เล่นที่ยังอยู่
+    if (finishedRankings.some((r) => r.id === currentTurnId)) {
+      const nextId = getNextActivePlayerId(currentTurnId, 1)
+      if (nextId) setCurrentTurnId(nextId)
+      return
+    }
+
     const timer = setTimeout(() => {
       botPlayTurn(currentTurnId)
-    }, 1200)
+    }, 1000)
 
     return () => clearTimeout(timer)
-  }, [currentTurnId, gameStatus, gamePhase, currentColor, discardPile, drawStack])
+  }, [currentTurnId, gameStatus, gamePhase, currentColor, discardPile, drawStack, finishedRankings])
 
   const botPlayTurn = (botId) => {
     const botHand = hands[botId] || []
-    const botName = activePlayers.find((p) => p.id === botId)?.name || botId
+    const botName = allPlayers.find((p) => p.id === botId)?.name || botId
 
     // 0. หากมีโทษจั่วสะสมอยู่ (+2 / +4 Stacking) บอทต้องหาไพ่ +2 หรือ +4 มาหลบ
     if (drawStack > 0) {
@@ -494,9 +564,9 @@ function UnoGame({ setCurrentPage }) {
       // ถ้าไม่มีไพ่ +2 หรือ +4 บอทต้องจั่วรับโทษสะสมและเสียตาเล่น
       addLog(`💥 🤖 ${botName} ไม่มีไพ่ +2 หรือ +4 มาหลบ จึงต้องจั่วรับโทษสะสม +${drawStack} ใบ!`)
       drawCardsFor(botId, drawStack)
-      const nextId = getNextPlayerId(botId, 1)
+      const nextId = getNextActivePlayerId(botId, 1)
       setDrawStack(0)
-      setCurrentTurnId(nextId)
+      if (nextId) setCurrentTurnId(nextId)
       return
     }
 
@@ -557,9 +627,46 @@ function UnoGame({ setCurrentPage }) {
         ...prev,
         [botId]: [...(prev[botId] || []), newCard],
       }))
-      const nextId = getNextPlayerId(botId, 1)
-      setCurrentTurnId(nextId)
+      const nextId = getNextActivePlayerId(botId, 1)
+      if (nextId) setCurrentTurnId(nextId)
     }
+  }
+
+  // จำลองผลการแข่งขันของบอทที่เหลือให้จบลงทันที (สำหรับกรณีผู้เล่นชนะไปแล้วและไม่อยากนั่งรอนาน)
+  const handleInstantFinishRemaining = () => {
+    let currentHands = { ...hands }
+    let currentFinished = [...finishedRankings]
+    let remaining = allPlayers.filter((p) => !currentFinished.some((r) => r.id === p.id))
+
+    // เรียงบอทที่เหลือตามจำนวนไพ่ในมือน้อยสุด -> มากสุด เพื่อตัดสินอันดับอย่างเป็นธรรม
+    remaining.sort((a, b) => (currentHands[a.id]?.length || 0) - (currentHands[b.id]?.length || 0))
+
+    while (remaining.length > 1) {
+      const winnerBot = remaining.shift()
+      currentFinished.push({
+        id: winnerBot.id,
+        name: winnerBot.name,
+        rank: currentFinished.length + 1,
+        isUser: false,
+        avatar: winnerBot.avatar,
+      })
+    }
+
+    // คนสุดท้ายที่เหลือคือผู้แพ้
+    if (remaining.length === 1) {
+      const loserBot = remaining[0]
+      currentFinished.push({
+        id: loserBot.id,
+        name: loserBot.name,
+        rank: currentFinished.length + 1,
+        isUser: false,
+        avatar: loserBot.avatar,
+        isLoser: true,
+      })
+    }
+
+    setFinishedRankings(currentFinished)
+    setGameStatus('game_over')
   }
 
   // บอทเลือกสีที่ดีที่สุดตามจำนวนไพ่ในมือ
@@ -684,7 +791,7 @@ function UnoGame({ setCurrentPage }) {
               • <strong>ระบบซ้อนโทษจั่ว (+2 / +4 Stacking)</strong>: เมื่อมีคนลง +2 หรือ +4 สามารถลงการ์ด +2 หรือ +4 เพื่อหลบให้คนถัดไปโดนแทน และโทษจั่วจะบวกสะสมทบไปเรื่อยๆ (เช่น โดน +2 ลง +2 ทบเป็น +4)!
             </p>
             <p className="text-[11px] leading-relaxed">
-              • แจกไพ่เริ่มต้นคนละ 7 ใบ ใครวางไพ่จนหมดมือก่อนจะเป็นผู้ชนะทันที!
+              • <strong>เล่นจนเหลือคนสุดท้าย</strong>: หากมีผู้เล่นมากกว่า 2 คน เกมจะเล่นต่อจนกว่าจะเหลือคนสุดท้าย (คนที่ทิ้งไพ่หมดก่อนจะได้อันดับ 1, 2, 3... และคนที่เหลือไพ่คนสุดท้ายจะเป็นผู้แพ้!)
             </p>
           </div>
 
@@ -704,31 +811,107 @@ function UnoGame({ setCurrentPage }) {
   // ================= 1. หน้าจอหลักของเกม UNO (PLAYING PHASE) =================
   return (
     <div className="min-h-[calc(100vh-100px)] flex flex-col justify-between select-none relative font-sans text-slate-100 animate-in fade-in">
-      {/* ================= MODAL แจ้งผลแพ้/ชนะ ================= */}
-      {gameStatus !== 'playing' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-8 text-center border-4 border-amber-400 shadow-2xl animate-in zoom-in-95">
-            <div className="w-20 h-20 mx-auto rounded-3xl flex items-center justify-center text-4xl mb-4 bg-amber-400/20 text-amber-400 animate-bounce">
-              {gameStatus === 'player_win' ? '🏆' : '💀'}
+      {/* ================= MODAL แจ้งผลการแข่งขัน & ตารางอันดับสรุปผล ================= */}
+      {gameStatus === 'game_over' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center border-4 border-amber-400 shadow-2xl animate-in zoom-in-95 text-white">
+            {/* หัวข้อแสดงผลตามอันดับของผู้เล่น */}
+            {(() => {
+              const userRanking = finishedRankings.find((r) => r.isUser)
+              const userRank = userRanking?.rank || 1
+              const isUserWinner = userRank === 1
+              const isUserLoser = userRanking?.isLoser
+
+              return (
+                <div>
+                  <div className="w-18 h-18 mx-auto rounded-3xl flex items-center justify-center text-4xl mb-3 bg-amber-400/20 text-amber-400 animate-bounce">
+                    {isUserWinner ? '🏆' : isUserLoser ? '💀' : '🎖️'}
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black mb-1">
+                    {isUserWinner
+                      ? '🎉 คุณคือแชมป์ UNO!'
+                      : isUserLoser
+                      ? '💀 คุณแพ้ในเกมนี้ (คนสุดท้าย)'
+                      : `คุณจบในอันดับที่ ${userRank}!`}
+                  </h2>
+                  <p className="text-xs text-slate-400 mb-5">
+                    {isUserWinner
+                      ? 'คุณทิ้งไพ่หมดมือเป็นคนแรกและคว้าอันดับที่ 1 ไปครอง!'
+                      : isUserLoser
+                      ? 'คุณเหลือไพ่เป็นคนสุดท้าย จึงต้องยอมรับความพ่ายแพ้ในรอบนี้'
+                      : `การแข่งขันดุเดือด! คุณทำผลงานได้ในอันดับที่ ${userRank}`}
+                  </p>
+                </div>
+              )
+            })()}
+
+            {/* ตารางสรุปอันดับผู้เล่นทุกคน (Rank 1 -> Last) */}
+            <div className="bg-slate-950/80 rounded-2xl border border-white/10 p-3 mb-6 space-y-2 text-left">
+              <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5 mb-1">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>ตารางสรุปอันดับการแข่งขัน:</span>
+              </span>
+
+              {finishedRankings.map((entry) => {
+                const isFirst = entry.rank === 1
+                const isSecond = entry.rank === 2
+                const isThird = entry.rank === 3
+                const isLoser = entry.isLoser
+
+                return (
+                  <div
+                    key={entry.id}
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
+                      entry.isUser
+                        ? isFirst
+                          ? 'bg-amber-400/20 border-amber-400 text-amber-300 ring-2 ring-amber-400/40 font-black'
+                          : isLoser
+                          ? 'bg-rose-500/20 border-rose-500 text-rose-300 ring-2 ring-rose-500/40 font-black'
+                          : 'bg-emerald-500/20 border-emerald-400 text-emerald-300 ring-2 ring-emerald-400/40 font-black'
+                        : isFirst
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                        : isLoser
+                        ? 'bg-rose-950/40 border-rose-500/30 text-rose-300'
+                        : 'bg-slate-900 border-white/10 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-base font-black w-6 text-center">
+                        {isFirst ? '🥇' : isSecond ? '🥈' : isThird ? '🥉' : isLoser ? '💀' : `${entry.rank}`}
+                      </span>
+                      <span className="text-base">{entry.avatar}</span>
+                      <span className="font-bold truncate max-w-[150px]">
+                        {entry.name} {entry.isUser && '(คุณ)'}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                        isFirst
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-xs'
+                          : isLoser
+                          ? 'bg-rose-600 text-white border-rose-400'
+                          : 'bg-white/10 text-slate-200 border-white/20'
+                      }`}
+                    >
+                      {isFirst ? 'ชนะเลิศ 🏆' : isLoser ? 'แพ้ (คนสุดท้าย)' : `อันดับที่ ${entry.rank}`}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
-            <h2 className="text-3xl font-black mb-2 text-white">
-              {gameStatus === 'player_win' ? '🎉 คุณชนะเกม UNO!' : `บอท ${winnerName} ชนะ!`}
-            </h2>
-            <p className="text-sm text-slate-400 mb-6">
-              {gameStatus === 'player_win'
-                ? 'ยินดีด้วย! คุณวางการ์ดจนหมดมือเป็นคนแรก!'
-                : `${winnerName} วางการ์ดจนหมดมือเป็นคนแรก ลองใหม่อีกครั้ง!`}
-            </p>
+
+            {/* ปุ่มกดเล่นใหม่ หรือตั้งค่าใหม่ */}
             <div className="flex gap-2">
               <button
                 onClick={() => setGamePhase('setup')}
-                className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition cursor-pointer"
+                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer"
               >
                 ⚙️ ตั้งค่าบอทใหม่
               </button>
               <button
                 onClick={() => initGame(botCount)}
-                className="flex-1 py-3.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black rounded-xl shadow-lg shadow-amber-400/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
+                className="flex-1 py-3 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-400/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
               >
                 🔄 เล่นใหม่อีกครั้ง
               </button>
@@ -775,11 +958,11 @@ function UnoGame({ setCurrentPage }) {
             <h1 className="font-black text-base sm:text-lg text-white leading-none flex items-center gap-2">
               <span>UNO ARENA</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                คุณ + บอท {botCount} คน ({botCount + 1} คน)
+                เหลือแข่ง {activePlayers.length} / {allPlayers.length} คน
               </span>
             </h1>
             <p className="text-[10.5px] text-slate-400 mt-1">
-              ทิศทาง: <b className="text-amber-300">{direction === 1 ? 'ตามเข็มนาฬิกา ↻' : 'ทวนเข็มนาฬิกา ↺'}</b> • กฎ: ลงการ์ดได้เยอะสุด 2 ใบ
+              ทิศทาง: <b className="text-amber-300">{direction === 1 ? 'ตามเข็มนาฬิกา ↻' : 'ทวนเข็มนาฬิกา ↺'}</b> • กฎ: แข่งจนเหลือคนสุดท้าย 💀
             </p>
           </div>
         </div>
@@ -795,9 +978,11 @@ function UnoGame({ setCurrentPage }) {
           >
             <span className="w-2.5 h-2.5 rounded-full bg-current animate-ping"></span>
             <span>
-              {currentTurnId === 'player'
+              {finishedRankings.some((r) => r.isUser)
+                ? `ตาของ ${allPlayers.find((p) => p.id === currentTurnId)?.name || 'บอท'} ⚡ (คุณได้อันดับที่ ${finishedRankings.find((r) => r.isUser)?.rank})`
+                : currentTurnId === 'player'
                 ? 'ตาของคุณ (เลือกลง 1-2 ใบ)'
-                : `ตาของ ${activePlayers.find((p) => p.id === currentTurnId)?.name} ⚡`}
+                : `ตาของ ${allPlayers.find((p) => p.id === currentTurnId)?.name} ⚡`}
             </span>
           </div>
 
@@ -840,12 +1025,16 @@ function UnoGame({ setCurrentPage }) {
               {BOT_PROFILES.slice(0, botCount).map((b) => {
                 const bHand = hands[b.id] || []
                 const isThisBotTurn = currentTurnId === b.id
+                const finishedInfo = finishedRankings.find((r) => r.id === b.id)
+                const isFinished = !!finishedInfo
 
                 return (
                   <div
                     key={b.id}
                     className={`p-2.5 rounded-2xl border transition-all ${
-                      isThisBotTurn
+                      isFinished
+                        ? 'bg-amber-950/30 border-amber-500/30 opacity-80'
+                        : isThisBotTurn
                         ? 'bg-blue-950/70 border-blue-400/80 ring-2 ring-blue-400/40 shadow-md'
                         : 'bg-slate-950/50 border-white/10 opacity-90'
                     }`}
@@ -856,37 +1045,52 @@ function UnoGame({ setCurrentPage }) {
                         <div>
                           <p className="font-bold text-xs text-white leading-tight">{b.name}</p>
                           <p className="text-[9.5px] text-slate-400">
-                            {isThisBotTurn ? '⚡ กำลังวิเคราะห์ไพ่...' : '💤 รอตาเดิน'}
+                            {isFinished
+                              ? `🏆 จบอันดับที่ ${finishedInfo.rank}`
+                              : isThisBotTurn
+                              ? '⚡ กำลังวิเคราะห์ไพ่...'
+                              : '💤 รอตาเดิน'}
                           </p>
                         </div>
                       </div>
                       <span
                         className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                          bHand.length === 1
+                          isFinished
+                            ? 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+                            : bHand.length === 1
                             ? 'bg-rose-500/20 text-rose-300 border-rose-400 animate-pulse font-extrabold'
                             : 'bg-blue-500/20 text-blue-300 border-blue-400/30'
                         }`}
                       >
-                        {bHand.length} ใบ {bHand.length === 1 && '🔥'}
+                        {isFinished
+                          ? `${finishedInfo.rank === 1 ? '🥇 อันดับ 1' : finishedInfo.rank === 2 ? '🥈 อันดับ 2' : finishedInfo.rank === 3 ? '🥉 อันดับ 3' : `อันดับ ${finishedInfo.rank}`}`
+                          : `${bHand.length} ใบ ${bHand.length === 1 ? '🔥' : ''}`}
                       </span>
                     </div>
 
-                    {/* ไพ่คว่ำหน้าของบอท */}
-                    <div className="flex flex-wrap gap-1 items-center">
-                      {bHand.slice(0, 10).map((c, i) => (
-                        <div
-                          key={c.id || i}
-                          className="w-5 h-7 rounded bg-gradient-to-br from-red-700 via-slate-900 to-black border border-amber-400/50 flex items-center justify-center text-[7px] text-amber-400 font-bold rotate-2 shadow-2xs"
-                        >
-                          U
-                        </div>
-                      ))}
-                      {bHand.length > 10 && (
-                        <span className="text-[9px] text-slate-400 font-mono pl-1">
-                          +{bHand.length - 10}
-                        </span>
-                      )}
-                    </div>
+                    {/* ไพ่คว่ำหน้าของบอท หรือ ป้ายจบเกม */}
+                    {isFinished ? (
+                      <div className="py-1 px-2 rounded-lg bg-black/40 text-[10px] text-amber-300/80 font-bold flex items-center justify-between">
+                        <span>ทิ้งไพ่หมดแล้ว 🎉</span>
+                        <span>{finishedInfo.rank === 1 ? 'แชมป์ 🥇' : `อันดับ ${finishedInfo.rank}`}</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1 items-center">
+                        {bHand.slice(0, 10).map((c, i) => (
+                          <div
+                            key={c.id || i}
+                            className="w-5 h-7 rounded bg-gradient-to-br from-red-700 via-slate-900 to-black border border-amber-400/50 flex items-center justify-center text-[7px] text-amber-400 font-bold rotate-2 shadow-2xs"
+                          >
+                            U
+                          </div>
+                        ))}
+                        {bHand.length > 10 && (
+                          <span className="text-[9px] text-slate-400 font-mono pl-1">
+                            +{bHand.length - 10}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -1042,160 +1246,194 @@ function UnoGame({ setCurrentPage }) {
 
         {/* ================= 3. ฝั่งขวา: ไพ่ในมือของเรา (รองรับการเลือกลง 1-2 ใบ) ================= */}
         <div className="lg:col-span-4 bg-slate-900/80 backdrop-blur-md rounded-3xl border border-white/10 p-3 sm:p-4 flex flex-col justify-between shadow-xl min-h-0">
-          <div>
-            {/* ส่วนหัวฝั่งผู้เล่น */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white shadow-md">
-                  <User className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="font-bold text-xs sm:text-sm text-white">ไพ่ในมือของคุณ</h2>
-                  <p className="text-[10px] text-emerald-300 font-mono">
-                    {currentTurnId === 'player' ? '👉 ตาของคุณ (คลิกเพื่อเลือก)' : '⏳ รอตากลยุทธ์ของบอท'}
-                  </p>
-                </div>
+          {finishedRankings.some((r) => r.isUser) ? (
+            // ผู้เล่นวางไพ่หมดมือเรียบร้อยแล้ว ได้อันดับไปแล้ว
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
+              <div className="w-16 h-16 rounded-3xl bg-amber-400/20 text-amber-400 flex items-center justify-center text-3xl mb-3 shadow-lg animate-bounce">
+                {finishedRankings.find((r) => r.isUser)?.rank === 1 ? '🥇' : '🎉'}
               </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold font-mono">
-                {playerHand.length} ใบ
-              </span>
+              <h3 className="text-xl font-black text-white mb-1">
+                คุณทิ้งไพ่หมดมือแล้ว!
+              </h3>
+              <p className="text-xs text-amber-300 font-bold mb-3">
+                คว้าอันดับที่ {finishedRankings.find((r) => r.isUser)?.rank} ไปครองเรียบร้อย 🏆
+              </p>
+              <div className="bg-slate-950/70 border border-white/10 rounded-2xl p-3.5 max-w-xs w-full text-xs text-slate-300 space-y-1 mb-4">
+                <p className="font-semibold text-emerald-400 flex items-center justify-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span>กำลังรับชมบอท AI แข่งขันต่อ</span>
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  เกมจะดำเนินต่อไปจนกว่าจะเหลือคนสุดท้ายที่จะเป็นผู้แพ้
+                </p>
+              </div>
+
+              {/* ปุ่มข้ามไปดูผลลัพธ์ทันที */}
+              <button
+                onClick={handleInstantFinishRemaining}
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition transform hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                <span>จำลองผลที่เหลือ & ดูผลลัพธ์ทันที</span>
+              </button>
             </div>
+          ) : (
+            <>
+              <div>
+                {/* ส่วนหัวฝั่งผู้เล่น */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white shadow-md">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-xs sm:text-sm text-white">ไพ่ในมือของคุณ</h2>
+                      <p className="text-[10px] text-emerald-300 font-mono">
+                        {currentTurnId === 'player' ? '👉 ตาของคุณ (คลิกเพื่อเลือก)' : '⏳ รอตากลยุทธ์ของบอท'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold font-mono">
+                    {playerHand.length} ใบ
+                  </span>
+                </div>
 
-            {/* แถบการเลือกไพ่ (เลือกลงได้ 1-2 ใบ) */}
-            <div className="bg-slate-950/70 border border-amber-500/40 rounded-2xl p-2.5 mb-2.5 shadow-md flex items-center justify-between gap-2">
-              <div className="text-left">
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">
-                  เลือกไว้: {selectedCardIds.length} / 2 ใบ
-                </span>
-                <span className="text-xs font-black text-amber-300">
-                  {drawStack > 0
-                    ? `⚠️ โดนโทษสะสม +${drawStack} ใบ! ลง +2 หรือ +4 เพื่อหลบ หรือคลิกจั่วรับโทษ`
-                    : selectedCardIds.length === 0
-                    ? 'คลิกไพ่ในมือเพื่อเลือกลง (สูงสุด 2 ใบ)'
-                    : selectedCardIds.length === 1
-                    ? 'เลือกแล้ว 1 ใบ (คลิกอีกใบที่เลขเหมือนกันเพื่อลงคู่)'
-                    : 'เลือกครบ 2 ใบแล้ว! พร้อมลงคู่ 🔥'}
-                </span>
-              </div>
-
-              {selectedCardIds.length > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setSelectedCardIds([])}
-                    className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
-                    title="ล้างที่เลือก"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={handleConfirmPlaySelected}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black shadow-lg transition transform active:scale-95 cursor-pointer flex items-center gap-1 ${
-                      selectedCardIds.length === 2
-                        ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 hover:from-amber-500 hover:to-yellow-600 ring-2 ring-yellow-300'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    }`}
-                  >
-                    <span>
+                {/* แถบการเลือกไพ่ (เลือกลงได้ 1-2 ใบ) */}
+                <div className="bg-slate-950/70 border border-amber-500/40 rounded-2xl p-2.5 mb-2.5 shadow-md flex items-center justify-between gap-2">
+                  <div className="text-left">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">
+                      เลือกไว้: {selectedCardIds.length} / 2 ใบ
+                    </span>
+                    <span className="text-xs font-black text-amber-300">
                       {drawStack > 0
-                        ? selectedCardIds.length === 2
-                          ? 'ลงคู่หลบโทษ 🔥'
-                          : 'ลงหลบโทษ 🛡️'
-                        : selectedCardIds.length === 2
-                        ? 'ลงคู่ 2 ใบ 🔥'
-                        : 'ลง 1 ใบ'}
+                        ? `⚠️ โดนโทษสะสม +${drawStack} ใบ! ลง +2 หรือ +4 เพื่อหลบ หรือคลิกจั่วรับโทษ`
+                        : selectedCardIds.length === 0
+                        ? 'คลิกไพ่ในมือเพื่อเลือกลง (สูงสุด 2 ใบ)'
+                        : selectedCardIds.length === 1
+                        ? 'เลือกแล้ว 1 ใบ (คลิกอีกใบที่เลขเหมือนกันเพื่อลงคู่)'
+                        : 'เลือกครบ 2 ใบแล้ว! พร้อมลงคู่ 🔥'}
                     </span>
-                  </button>
+                  </div>
+
+                  {selectedCardIds.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setSelectedCardIds([])}
+                        className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
+                        title="ล้างที่เลือก"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={handleConfirmPlaySelected}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black shadow-lg transition transform active:scale-95 cursor-pointer flex items-center gap-1 ${
+                          selectedCardIds.length === 2
+                            ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 hover:from-amber-500 hover:to-yellow-600 ring-2 ring-yellow-300'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        }`}
+                      >
+                        <span>
+                          {drawStack > 0
+                            ? selectedCardIds.length === 2
+                              ? 'ลงคู่หลบโทษ 🔥'
+                              : 'ลงหลบโทษ 🛡️'
+                            : selectedCardIds.length === 2
+                            ? 'ลงคู่ 2 ใบ 🔥'
+                            : 'ลง 1 ใบ'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* แสดงการ์ดในมือของผู้เล่น */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[320px] overflow-y-auto p-1.5 bg-slate-950/40 rounded-2xl border border-white/5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-white/20">
-              {playerHand.map((card) => {
-                const isSelected = selectedCardIds.includes(card.id)
-                const isFirstCard = selectedCardIds[0] === card.id
-                const isSecondCard = selectedCardIds[1] === card.id
+                {/* แสดงการ์ดในมือของผู้เล่น */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[320px] overflow-y-auto p-1.5 bg-slate-950/40 rounded-2xl border border-white/5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-white/20">
+                  {playerHand.map((card) => {
+                    const isSelected = selectedCardIds.includes(card.id)
+                    const isFirstCard = selectedCardIds[0] === card.id
 
-                // คำนวณว่าการ์ดนี้คลิกได้ไหม
-                let isClickable = false
-                if (currentTurnId === 'player') {
-                  if (isSelected) {
-                    isClickable = true
-                  } else if (selectedCardIds.length === 0) {
-                    const canPlayDirect = canPlayFirstCard(card, currentTopCard, currentColor, drawStack)
-                    const hasPlayablePartner = playerHand.some(
-                      (c) => c.id !== card.id && c.value === card.value && canPlayFirstCard(c, currentTopCard, currentColor, drawStack)
+                    // คำนวณว่าการ์ดนี้คลิกได้ไหม
+                    let isClickable = false
+                    if (currentTurnId === 'player') {
+                      if (isSelected) {
+                        isClickable = true
+                      } else if (selectedCardIds.length === 0) {
+                        const canPlayDirect = canPlayFirstCard(card, currentTopCard, currentColor, drawStack)
+                        const hasPlayablePartner = playerHand.some(
+                          (c) => c.id !== card.id && c.value === card.value && canPlayFirstCard(c, currentTopCard, currentColor, drawStack)
+                        )
+                        isClickable = canPlayDirect || hasPlayablePartner
+                      } else if (selectedCardIds.length === 1) {
+                        const firstCard = playerHand.find((c) => c.id === selectedCardIds[0])
+                        isClickable = canPlaySecondCard(card, firstCard) || canPlayFirstCard(card, currentTopCard, currentColor, drawStack)
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={card.id}
+                        onClick={() => handleCardClick(card)}
+                        disabled={!isClickable}
+                        className={`w-full h-22 sm:h-26 rounded-xl ${getCardColorClass(
+                          card.color
+                        )} flex flex-col justify-between p-1.5 transition-all duration-200 transform relative select-none ${
+                          isSelected
+                            ? '-translate-y-2 ring-4 ring-amber-300 shadow-2xl scale-105 z-20'
+                            : isClickable
+                            ? 'hover:-translate-y-1 hover:scale-102 ring-1 ring-white/60 shadow-md cursor-pointer'
+                            : 'opacity-40 grayscale-[40%] cursor-not-allowed'
+                        }`}
+                      >
+                        {/* ป้ายลำดับที่เลือก (1 หรือ 2) */}
+                        {isSelected && (
+                          <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-md border border-white">
+                            {isFirstCard ? '1' : '2'}
+                          </span>
+                        )}
+
+                        <span className="text-[10px] font-black self-start leading-none">
+                          {card.label}
+                        </span>
+                        <span className="text-xl font-black mx-auto drop-shadow-sm leading-none">
+                          {card.label}
+                        </span>
+                        <span className="text-[10px] font-black self-end transform rotate-180 leading-none">
+                          {card.label}
+                        </span>
+                      </button>
                     )
-                    isClickable = canPlayDirect || hasPlayablePartner
-                  } else if (selectedCardIds.length === 1) {
-                    const firstCard = playerHand.find((c) => c.id === selectedCardIds[0])
-                    isClickable = canPlaySecondCard(card, firstCard) || canPlayFirstCard(card, currentTopCard, currentColor, drawStack)
-                  }
-                }
+                  })}
+                </div>
+              </div>
 
-                return (
-                  <button
-                    key={card.id}
-                    onClick={() => handleCardClick(card)}
-                    disabled={!isClickable}
-                    className={`w-full h-22 sm:h-26 rounded-xl ${getCardColorClass(
-                      card.color
-                    )} flex flex-col justify-between p-1.5 transition-all duration-200 transform relative select-none ${
-                      isSelected
-                        ? '-translate-y-2 ring-4 ring-amber-300 shadow-2xl scale-105 z-20'
-                        : isClickable
-                        ? 'hover:-translate-y-1 hover:scale-102 ring-1 ring-white/60 shadow-md cursor-pointer'
-                        : 'opacity-40 grayscale-[40%] cursor-not-allowed'
-                    }`}
-                  >
-                    {/* ป้ายลำดับที่เลือก (1 หรือ 2) */}
-                    {isSelected && (
-                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-md border border-white">
-                        {isFirstCard ? '1' : '2'}
-                      </span>
-                    )}
+              {/* สรุปด้านล่าง: ปุ่มช่วยจั่วการ์ด */}
+              <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between shrink-0">
+                <span className="text-[11px] text-slate-400">
+                  {playerHand.length === 1 ? '🔥 UNO! เหลือไพ่ใบสุดท้ายแล้ว!' : `เหลืออีก ${playerHand.length} ใบ`}
+                </span>
 
-                    <span className="text-[10px] font-black self-start leading-none">
-                      {card.label}
-                    </span>
-                    <span className="text-xl font-black mx-auto drop-shadow-sm leading-none">
-                      {card.label}
-                    </span>
-                    <span className="text-[10px] font-black self-end transform rotate-180 leading-none">
-                      {card.label}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* สรุปด้านล่าง: ปุ่มช่วยจั่วการ์ด */}
-          <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between shrink-0">
-            <span className="text-[11px] text-slate-400">
-              {playerHand.length === 1 ? '🔥 UNO! เหลือไพ่ใบสุดท้ายแล้ว!' : `เหลืออีก ${playerHand.length} ใบ`}
-            </span>
-
-            {currentTurnId === 'player' && (
-              drawStack > 0 ? (
-                <button
-                  onClick={handlePlayerDraw}
-                  className="px-3.5 py-1.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-black rounded-lg border border-rose-400/80 shadow-lg transition cursor-pointer flex items-center gap-1.5 animate-pulse"
-                >
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  <span>จั่วรับโทษสะสม (+{drawStack} ใบ)</span>
-                </button>
-              ) : !hasDrawnThisTurn && (
-                <button
-                  onClick={handlePlayerDraw}
-                  className="px-3 py-1.5 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-bold rounded-lg border border-amber-400/40 transition cursor-pointer"
-                >
-                  + จั่วการ์ด 1 ใบ
-                </button>
-              )
-            )}
-          </div>
+                {currentTurnId === 'player' && (
+                  drawStack > 0 ? (
+                    <button
+                      onClick={handlePlayerDraw}
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-black rounded-lg border border-rose-400/80 shadow-lg transition cursor-pointer flex items-center gap-1.5 animate-pulse"
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      <span>จั่วรับโทษสะสม (+{drawStack} ใบ)</span>
+                    </button>
+                  ) : !hasDrawnThisTurn && (
+                    <button
+                      onClick={handlePlayerDraw}
+                      className="px-3 py-1.5 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-bold rounded-lg border border-amber-400/40 transition cursor-pointer"
+                    >
+                      + จั่วการ์ด 1 ใบ
+                    </button>
+                  )
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
