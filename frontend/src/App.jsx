@@ -14,6 +14,17 @@ function App() {
   // เก็บข้อมูลผู้ใช้ที่ Login สำเร็จจาก MySQL
   const [currentUser, setCurrentUser] = useState(null)
 
+  // ถ้าเลือกหน้า Login ให้แสดงหน้า LoginPage แบบเดี่ยวๆ เต็มจอ (ไม่มี Navbar/Aside มารบกวน)
+  if (currentPage === 'login') {
+    return (
+      <LoginPage
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+        setCurrentPage={setCurrentPage}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
       {/* ส่วนแถบเมนูด้านบน */}
@@ -41,13 +52,6 @@ function App() {
             {currentPage === 'about' && <AboutPage />}
             {currentPage === 'guide' && <GuidePage setCurrentPage={setCurrentPage} />}
             {currentPage === 'game' && <Game setCurrentPage={setCurrentPage} />}
-            {currentPage === 'login' && (
-              <LoginPage
-                currentUser={currentUser}
-                setCurrentUser={setCurrentUser}
-                setCurrentPage={setCurrentPage}
-              />
-            )}
           </main>
 
           {/* ส่วนท้ายเว็บ - ซ่อนในหน้าเกมเพื่อให้แสดงผลเต็มหน้าจอ 1 หน้าพอดี */}
