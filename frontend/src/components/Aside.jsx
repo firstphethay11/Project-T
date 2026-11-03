@@ -3,6 +3,7 @@ import {
   Home,
   Users,
   Gamepad2,
+  Moon,
   LogIn,
   FolderGit2,
   Settings,
@@ -18,6 +19,7 @@ function Aside({ currentPage, setCurrentPage }) {
     { id: 'home', label: 'หน้าแรก (Home)', icon: Home },
     { id: 'about', label: 'สมาชิกในทีม (About)', icon: Users },
     { id: 'game', label: 'เกมเศรษฐี (Game)', icon: Gamepad2 },
+    { id: 'werewolf', label: 'เกมแวร์วูล์ฟ (Werewolf)', icon: Moon },
     { id: 'login', label: 'เข้าสู่ระบบ (MySQL Login)', icon: LogIn },
   ]
 
@@ -81,7 +83,7 @@ function Aside({ currentPage, setCurrentPage }) {
         </nav>
       </div>
 
-      {/* ส่วนล่างของ Aside (ติดขอบล่างของหน้าจอพอดี) */}
+      {/* ส่วนล่างของ Aside */}
       <div className="p-4 border-t border-gray-100">
         <button
           title={isCollapsed ? 'ตั้งค่า (Settings)' : ''}

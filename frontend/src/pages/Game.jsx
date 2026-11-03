@@ -423,7 +423,7 @@ function Game({ setCurrentPage }) {
             </div>
           </div>
 
-          {/* 2 ปุ่ม: เริ่มเล่น vs กลับหน้าแรก */}
+          {/* 2 ปุ่ม: เริ่มเล่นเกมเศรษฐี vs กลับหน้าแรก */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             {setCurrentPage && (
               <button
@@ -431,7 +431,7 @@ function Game({ setCurrentPage }) {
                 className="w-full sm:w-auto px-5 py-3 rounded-xl border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer order-2 sm:order-1"
               >
                 <Home className="w-4 h-4 text-gray-500" />
-                <span>ยังไม่เล่น (กลับหน้าแรก)</span>
+                <span>กลับหน้าแรก</span>
               </button>
             )}
 
@@ -439,10 +439,31 @@ function Game({ setCurrentPage }) {
               onClick={() => setGamePhase('rps')}
               className="w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 transition transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-2"
             >
-              <span>เริ่มเล่นเกมเลย!</span>
+              <span>🎲 เริ่มเล่นเกมเศรษฐี!</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
+
+          {/* ทางเลือก: สลับไปเล่นเกมที่ 2 (เกมแวร์วูล์ฟ) */}
+          {setCurrentPage && (
+            <div className="mt-6 pt-5 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950 p-4 rounded-2xl text-left">
+              <div>
+                <p className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                  <span>🐺</span>
+                  <span>เกมใหม่: เกมแวร์วูล์ฟ (Werewolf)</span>
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  ค้นหาความจริงและจับหมาป่าในคืนพระจันทร์เต็มดวง
+                </p>
+              </div>
+              <button
+                onClick={() => setCurrentPage('werewolf')}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition shrink-0 cursor-pointer"
+              >
+                สลับไปเล่นเกมแวร์วูล์ฟ →
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )

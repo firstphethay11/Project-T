@@ -6,10 +6,11 @@ import HomePage from './pages/HomePage'
 import AboutPage from './pages/AboutPage'
 import GuidePage from './pages/GuidePage'
 import Game from './pages/Game'
+import WerewolfGame from './pages/WerewolfGame'
 import LoginPage from './pages/LoginPage'
 
 function App() {
-  // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'about', 'guide', 'game', หรือ 'login')
+  // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'about', 'guide', 'game', 'werewolf', หรือ 'login')
   const [currentPage, setCurrentPage] = useState('home')
   // เก็บข้อมูลผู้ใช้ที่ Login สำเร็จจาก MySQL
   const [currentUser, setCurrentUser] = useState(null)
@@ -24,6 +25,8 @@ function App() {
       />
     )
   }
+
+  const isGameView = currentPage === 'game' || currentPage === 'werewolf'
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
@@ -43,7 +46,7 @@ function App() {
           {/* ส่วนเนื้อหาหลักที่สลับตามปุ่มที่กด */}
           <main
             className={`flex-grow w-full mx-auto ${
-              currentPage === 'game'
+              isGameView
                 ? 'max-w-5xl px-4 py-3 flex flex-col justify-center'
                 : 'max-w-4xl px-6 py-8'
             }`}
@@ -52,10 +55,11 @@ function App() {
             {currentPage === 'about' && <AboutPage />}
             {currentPage === 'guide' && <GuidePage setCurrentPage={setCurrentPage} />}
             {currentPage === 'game' && <Game setCurrentPage={setCurrentPage} />}
+            {currentPage === 'werewolf' && <WerewolfGame setCurrentPage={setCurrentPage} />}
           </main>
 
           {/* ส่วนท้ายเว็บ - ซ่อนในหน้าเกมเพื่อให้แสดงผลเต็มหน้าจอ 1 หน้าพอดี */}
-          {currentPage !== 'game' && <Footer />}
+          {!isGameView && <Footer />}
         </div>
       </div>
     </div>
