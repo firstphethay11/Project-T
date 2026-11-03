@@ -29,6 +29,8 @@ import {
   Vote,
   Trophy,
   Gavel,
+  MessageSquare,
+  Send,
 } from 'lucide-react'
 
 // รายชื่อและข้อมูลความสามารถของทั้ง 9 บทบาท
@@ -236,6 +238,12 @@ function WerewolfGame({ setCurrentPage }) {
   const [voteTally, setVoteTally] = useState({})
   const [executionResult, setExecutionResult] = useState(null)
 
+  // ================= ระบบสนทนา & ถกเถียงยามเช้าของบอท =================
+  const [dayTab, setDayTab] = useState('roster') // 'roster' | 'chat'
+  const [morningMessages, setMorningMessages] = useState([])
+  const [botThoughts, setBotThoughts] = useState({})
+  const [userChatInput, setUserChatInput] = useState('')
+
   // สรุปเหตุการณ์ยามเช้า (Morning Report) และ จบเกม (Game Over)
   const [morningReport, setMorningReport] = useState(null)
   const [gameOverResult, setGameOverResult] = useState(null)
@@ -409,6 +417,201 @@ function WerewolfGame({ setCurrentPage }) {
     return false
   }
 
+  // ฟังก์ชันสร้างความคิดและบทสนทนายามเช้าของบอท (Bot Dialogue System)
+  const generateMorningDiscussions = (currentRoster, deadList, round) => {
+    const livingBots = currentRoster.filter((p) => !p.isUser && p.isAlive)
+    const livingNonWolves = currentRoster.filter((p) => p.isAlive && p.role.team !== 'werewolf')
+    const livingWolves = currentRoster.filter((p) => p.isAlive && p.role.team === 'werewolf')
+    const deadName = deadList && deadList.length > 0 ? deadList.map((d) => d.name).join(', ') : null
+
+    const newThoughts = {}
+    const newMessages = []
+
+    // ข้อความประกาศเปิดลานสนทนา
+    newMessages.push({
+      id: `sys-${round}`,
+      senderId: -1,
+      senderName: '📢 ประกาศจากศาลหมู่บ้าน',
+      isSystem: true,
+      text: deadName
+        ? `รุ่งเช้าวันที่ ${round} มาถึงแล้ว... เมื่อคืนพบผู้เสียชีวิต: ${deadName} ขอให้ชาวบ้านร่วมกันถกเถียงและจับตัวคนร้าย!`
+        : `รุ่งเช้าวันที่ ${round} มาถึงแล้ว... เมื่อคืนไม่มีผู้เสียชีวิต ทุกคนปลอดภัยดี ร่วมกันถกเถียงหาตัวผู้ต้องสงสัย!`,
+      time: `เช้า วันที่ ${round}`,
+    })
+
+    livingBots.forEach((bot) => {
+      let speech = ''
+      const otherLiving = currentRoster.filter((p) => p.id !== bot.id && p.isAlive)
+      const randomOther = otherLiving[Math.floor(Math.random() * otherLiving.length)]
+
+      switch (bot.role.id) {
+        case 'seer': {
+          if (livingWolves.length > 0 && Math.random() > 0.4) {
+            const foundWolf = livingWolves[Math.floor(Math.random() * livingWolves.length)]
+            speech = `ทุกคนฟังฉัน! เมื่อคืนฉันใช้พลังส่องดู "${foundWolf.name}" มาแล้ว... ปรากฏว่าเป็นหมาป่าตัวจริง! รีบโหวตประหารด่วน 👁️`
+          } else if (livingNonWolves.length > 0) {
+            const innocent = livingNonWolves[Math.floor(Math.random() * livingNonWolves.length)]
+            speech = `เมื่อคืนฉันส่องดู "${innocent.name}" แล้ว ยืนยันว่าเขาเป็นคนดีบริสุทธิ์ อย่าไปโหวตเขานะ!`
+          } else {
+            speech = `ฉันกำลังรวบรวมเบาะแส คืนนี้จะใช้พลังหาตัวหมาป่าที่แฝงตัวอยู่ให้เจอ!`
+          }
+          break
+        }
+        case 'wolf_seer': {
+          const target = randomOther?.name || 'ใครบางคน'
+          const wolfFakes = [
+            `ฉันมีลางสังหรณ์ว่า "${target}" กำลังพยายามตีเนียนเป็นคนดี ระวังตัวไว้นะทุกคน... 🔮`,
+            `อย่าเพิ่งหลงเชื่อใครง่ายๆ นะ ฉันคิดว่าหมาป่าตัวจริงกำลังเงียบเพื่อหลบสายตา!`,
+            `เมื่อคืนได้ยินเสียงกุกกักแถวบ้าน "${target}" น่าสงสัยสุดๆ!`,
+          ]
+          speech = wolfFakes[Math.floor(Math.random() * wolfFakes.length)]
+          break
+        }
+        case 'werewolf':
+        case 'wolf_pup': {
+          const nonWolfTarget = livingNonWolves.length > 0
+            ? livingNonWolves[Math.floor(Math.random() * livingNonWolves.length)].name
+            : 'ใครบางคน'
+          const wolfLies = [
+            `เมื่อคืนฉันได้ยินเสียงเห่าหอนแถวบ้านของ "${nonWolfTarget}"... ฉันว่าเขาต้องสงสัยที่สุด! 🐺`,
+            `ฉันเป็นแค่ชาวบ้านตัวเล็กๆ คนหนึ่งนะ เมื่อคืนกลัวจนตัวสั่น อย่าเพิ่งรีบโหวตฉันเลย 🥺`,
+            `สังเกตมั้ยว่า "${nonWolfTarget}" ดูทำตัวไม่ค่อยเป็นธรรมชาติ เช้านี้มีพิรุธจัง!`,
+            deadName
+              ? `น่าสงสาร ${deadName} มาก... เราต้องสามัคคีกันหาตัวหมาป่าตัวจริงให้เจอนะทุกคน`
+              : `โชคดีที่เมื่อคืนไม่มีใครตาย แต่เราต้องระวังตัว คนที่น่าสงสัยคือ "${nonWolfTarget}"`,
+          ]
+          speech = wolfLies[Math.floor(Math.random() * wolfLies.length)]
+          break
+        }
+        case 'bodyguard': {
+          speech = deadList && deadList.length === 0
+            ? `เมื่อคืนฉันไปวางกำลังคุ้มกันอย่างเต็มที่ โชคดีจริงๆ ที่ทุกคนรอดปลอดภัยในเช้านี้ 🛡️`
+            : `เสียใจด้วยจริงๆ ที่คุ้มกันไม่ทัน... วันนี้ต้องช่วยกันลากคอคนร้ายมาลงโทษให้ได้!`
+          break
+        }
+        case 'hunter': {
+          const hunterLines = [
+            `ถ้าใครกล้าโหวตประหารฉัน ฉันไม่ยอมตายเปล่าแน่ ปืนในมือฉันพร้อมลั่นไกพาไปด้วยคนหนึ่ง! 🏹`,
+            `ฉันจับตามองทุกคนอยู่ ใครทำตัวแปลกๆ หรือชี้นำโหวต ระวังตัวไว้ให้ดี!`,
+          ]
+          speech = hunterLines[Math.floor(Math.random() * hunterLines.length)]
+          break
+        }
+        case 'witch': {
+          speech = `กลิ่นอายความตายเมื่อคืนรุนแรงมาก... ขวดยาของฉันพร้อมทำงานเสมอ ใครคิดร้ายระวังตัวไว้ 🧪`
+          break
+        }
+        case 'madman': {
+          const madLines = [
+            `ฮ่าๆๆๆ พวกแกไม่มีทางจับคนร้ายได้หรอก! ฉันยอมรับสารภาพเลยว่าฉันนี่แหละหมาป่า โหวตฉันสิ ประหารฉันเลย! 🤪`,
+            `โหวตฉันเลยสิ รออะไรอยู่ล่ะ? วันนี้ฉันต้องถูกนำตัวไปประหารให้ได้! 🏆`,
+            `ถ้าวันนี้พวกแกไม่กล้าโหวตประหารฉัน คืนนี้พวกแกทุกคนจะต้องเสียใจแน่ๆ ฮ่าๆๆ!`,
+          ]
+          speech = madLines[Math.floor(Math.random() * madLines.length)]
+          break
+        }
+        default: {
+          const suspectName = randomOther?.name || 'ใครบางคน'
+          const villagerLines = [
+            deadName
+              ? `เมื่อคืนน่ากลัวมาก เสียใจกับ ${deadName} ด้วย... เราต้องรีบหาตัวหมาป่าให้เจอ!`
+              : `โล่งอกไปทีที่เมื่อคืนไม่มีใครตาย! แต่คืนถัดไปเราจะประมาทไม่ได้`,
+            `ฉันสังเกตดู "${suspectName}" แล้วดูมีพิรุธสุดๆ ในรอบนี้ มีใครคิดเหมือนฉันบ้าง?`,
+            `ทุกคนใจเย็นๆ นะ อย่าเพิ่งโหวตมั่ว ถ้าเราประหารคนดีไป หมาป่าจะได้เปรียบ!`,
+            `ใครมีเบาะแสหรือข้อมูลอะไรที่เป็นประโยชน์ ช่วยพูดออกมาหน่อยเถอะ!`,
+          ]
+          speech = villagerLines[Math.floor(Math.random() * villagerLines.length)]
+          break
+        }
+      }
+
+      newThoughts[bot.id] = speech
+      newMessages.push({
+        id: `bot-${bot.id}-${round}`,
+        senderId: bot.id,
+        senderName: bot.name,
+        isUser: false,
+        role: bot.role,
+        text: speech,
+        time: `เช้า วันที่ ${round}`,
+      })
+    })
+
+    setBotThoughts(newThoughts)
+    setMorningMessages(newMessages)
+  }
+
+  // ส่งข้อความคุยในห้องสนทนาของหมู่บ้าน
+  const handleSendChatMessage = (customText = null) => {
+    const textToSend = (customText !== null ? customText : userChatInput).trim()
+    if (!textToSend || !userPlayer || !userPlayer.isAlive) return
+
+    const userMsg = {
+      id: `user-${Date.now()}`,
+      senderId: 0,
+      senderName: 'คุณ (ผู้เล่น)',
+      isUser: true,
+      text: textToSend,
+      time: `เช้า วันที่ ${roundNumber}`,
+    }
+
+    setMorningMessages((prev) => [...prev, userMsg])
+    setUserChatInput('')
+
+    // บอทตอบรับแบบสุ่มหรือตามข้อความ
+    setTimeout(() => {
+      const livingBots = roster.filter((p) => !p.isUser && p.isAlive)
+      if (livingBots.length === 0) return
+
+      const mentionedBot = livingBots.find((b) => textToSend.includes(b.name.replace('บอท', '')))
+      const responder = mentionedBot || livingBots[Math.floor(Math.random() * livingBots.length)]
+
+      let reply = ''
+      if (mentionedBot) {
+        const defensiveReplies = [
+          `เฮ้ย คุณกล่าวหาฉันทำไม! ฉันเป็นผู้บริสุทธิ์นะ อย่ามาใส่ร้าย! 😠`,
+          `มีหลักฐานอะไรมาบอกว่าฉันเป็นหมาป่า? ฉันแค่เงียบเพราะกำลังคิดอยู่ต่างหาก!`,
+          `คุณพยายามเบี่ยงเบนความสนใจไปที่ฉัน หรือว่าคุณเองนั่นแหละที่เป็นหมาป่า! 👀`,
+        ]
+        reply = defensiveReplies[Math.floor(Math.random() * defensiveReplies.length)]
+      } else if (textToSend.includes('คนดี') || textToSend.includes('อย่าโหวต')) {
+        const doubtReplies = [
+          `ทุกคนก็อ้างว่าตัวเองเป็นคนดีทั้งนั้นแหละ... ต้องดูที่ผลการกระทำ!`,
+          `ฟังดูมีเหตุผลนะ แต่ฉันก็ยังไม่ปักใจเชื่อร้อยเปอร์เซ็นต์`,
+          `ได้เลย ฉันจะลองจับตาดูคนอื่นดูก่อนในรอบนี้`,
+        ]
+        reply = doubtReplies[Math.floor(Math.random() * doubtReplies.length)]
+      } else if (textToSend.includes('สงสัย') || textToSend.includes('โหวต')) {
+        const agreeReplies = [
+          `น่าคิดเหมือนกันนะ... ฉันเริ่มเห็นด้วยกับที่คุณพูดแล้วสิ`,
+          `เราต้องร่วมมือกัน ถ้าใครมีหลักฐานชัดเจนก็ชี้นำมาได้เลย!`,
+          `อย่าเพิ่งรีบร้อนลงคะแนนเลย ฟังทุกคนพูดให้ครบก่อน`,
+        ]
+        reply = agreeReplies[Math.floor(Math.random() * agreeReplies.length)]
+      } else {
+        const generalReplies = [
+          `อืม น่าสนใจ... เดี๋ยวตอนลงคะแนนคงได้รู้กันว่าใครคิดยังไง`,
+          `เวลาประชุมมีจำกัด รีบตัดสินใจกันเถอะทุกคน! 🗳️`,
+          `ฉันเห็นด้วยนะ บรรยากาศเช้านี้ตึงเครียดมากจริงๆ`,
+        ]
+        reply = generalReplies[Math.floor(Math.random() * generalReplies.length)]
+      }
+
+      setMorningMessages((prev) => [
+        ...prev,
+        {
+          id: `bot-reply-${Date.now()}`,
+          senderId: responder.id,
+          senderName: responder.name,
+          isUser: false,
+          role: responder.role,
+          text: reply,
+          time: `เช้า วันที่ ${roundNumber}`,
+        },
+      ])
+    }, 500)
+  }
+
   // ตัดสินผลค่ำคืนและเข้าสู่เวลากลางวัน (พ้นคืนแรก $\rightarrow$ เช้าเปิดโหวตได้)
   const handleResolveNightToDay = () => {
     // 1. หาว่าหมาป่าฆ่าใคร
@@ -495,6 +698,10 @@ function WerewolfGame({ setCurrentPage }) {
       const deadNames = deadPlayers.map((d) => d.name).join(', ')
       addLog(`☀️ รุ่งอรุณวันที่ ${roundNumber}: พ้นคืนแรกแล้ว! พบศพผู้เสียชีวิต: ${deadNames}`)
     }
+
+    // สร้างบทสนทนาและความคิดของบอทยามเช้า (Bot Morning Discussions)
+    generateMorningDiscussions(updatedRoster, deadPlayers, roundNumber)
+    setDayTab('roster')
 
     // ตรวจสอบว่ามีฝ่ายใดชนะหรือไม่
     checkWinCondition(updatedRoster)
@@ -632,6 +839,7 @@ function WerewolfGame({ setCurrentPage }) {
     setMorningReport(null)
     setExecutionResult(null)
     setGameCycle('night')
+    setDayTab('roster')
     setRoundNumber((r) => r + 1)
     setSelectedTargetId(null)
     setSeerInspectionResult(null)
@@ -649,6 +857,10 @@ function WerewolfGame({ setCurrentPage }) {
     setMorningReport(null)
     setExecutionResult(null)
     setGameOverResult(null)
+    setMorningMessages([])
+    setBotThoughts({})
+    setUserChatInput('')
+    setDayTab('roster')
   }
 
   return (
@@ -1250,21 +1462,52 @@ function WerewolfGame({ setCurrentPage }) {
           >
             <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-400" />
-                <h4 className="font-bold text-xs sm:text-sm text-white">
-                  ผู้เล่นในหมู่บ้าน (12 คน) —{' '}
-                  {gameCycle === 'day' && !hasVotedToday ? (
-                    <span className="text-yellow-400 font-bold animate-pulse">
-                      คลิกเลือกผู้ต้องสงสัยเพื่อลงคะแนนโหวตประหาร 🗳️
-                    </span>
-                  ) : gameCycle === 'night' && isUserNightActor && !hasActedTonight ? (
-                    <span className="text-amber-400 animate-pulse">
-                      คลิกเลือกผู้เล่นเพื่อใช้พลังพิเศษ 🎯
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">สถานะผู้เล่น</span>
-                  )}
-                </h4>
+                {gameCycle === 'day' ? (
+                  <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button
+                      onClick={() => setDayTab('roster')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        dayTab === 'roster'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>ผังผู้เล่น (12 คน)</span>
+                    </button>
+
+                    <button
+                      onClick={() => setDayTab('chat')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer relative ${
+                        dayTab === 'chat'
+                          ? 'bg-amber-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-amber-300" />
+                      <span>💬 ถกเถียงยามเช้า</span>
+                      {morningMessages.length > 0 && (
+                        <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 font-black text-[9px] rounded-full">
+                          {morningMessages.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-400" />
+                    <h4 className="font-bold text-xs sm:text-sm text-white">
+                      ผู้เล่นในหมู่บ้าน (12 คน) —{' '}
+                      {isUserNightActor && !hasActedTonight ? (
+                        <span className="text-amber-400 animate-pulse">
+                          คลิกเลือกผู้เล่นเพื่อใช้พลังพิเศษ 🎯
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">สถานะผู้เล่น</span>
+                      )}
+                    </h4>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3 text-xs font-semibold">
@@ -1277,8 +1520,139 @@ function WerewolfGame({ setCurrentPage }) {
               </div>
             </div>
 
-            {/* การ์ดผู้เล่น 12 คน */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 overflow-y-auto max-h-[calc(100vh-340px)] p-1">
+            {/* สลับมุมมอง: ห้องแชทสนทนายามเช้า (Chat) หรือ ผังการ์ดผู้เล่น 12 คน (Roster) */}
+            {gameCycle === 'day' && dayTab === 'chat' ? (
+              <div className="flex-1 flex flex-col justify-between overflow-hidden min-h-0 bg-slate-950/80 rounded-xl border border-slate-800/80 p-2 sm:p-3">
+                {/* กล่องรายการข้อความสนทนา */}
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[calc(100vh-420px)]">
+                  {morningMessages.map((msg) => {
+                    if (msg.isSystem) {
+                      return (
+                        <div
+                          key={msg.id}
+                          className="p-2 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-200 text-xs text-center font-medium my-1"
+                        >
+                          <span className="font-bold text-amber-300 mr-1.5">{msg.senderName}:</span>
+                          {msg.text}
+                        </div>
+                      )
+                    }
+
+                    const isTeammateWolf = isUserWerewolfTeam && msg.role?.team === 'werewolf' && !msg.isUser
+
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex items-start gap-2 text-xs animate-in fade-in duration-200 ${
+                          msg.isUser ? 'flex-row-reverse' : ''
+                        }`}
+                      >
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border ${
+                            msg.isUser
+                              ? 'bg-indigo-600 text-white border-indigo-400'
+                              : isTeammateWolf
+                              ? 'bg-red-950 text-red-300 border-red-500/60'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          {msg.isUser ? <UserRound className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+                        </div>
+
+                        <div className={`max-w-[80%] flex flex-col ${msg.isUser ? 'items-end' : 'items-start'}`}>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="font-bold text-[11px] text-slate-300">
+                              {msg.senderName}
+                            </span>
+                            {isTeammateWolf && (
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-red-950 text-red-400 font-bold border border-red-500/40">
+                                🐺 {msg.role.name}
+                              </span>
+                            )}
+                            <span className="text-[9px] text-slate-500">{msg.time}</span>
+                          </div>
+
+                          <div
+                            className={`p-2.5 rounded-2xl leading-relaxed text-xs shadow-sm ${
+                              msg.isUser
+                                ? 'bg-indigo-600 text-white rounded-tr-none'
+                                : isTeammateWolf
+                                ? 'bg-red-950/40 text-red-100 border border-red-500/30 rounded-tl-none'
+                                : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'
+                            }`}
+                          >
+                            {msg.text}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* ปุ่มลัดพิมพ์ไว & ช่องกรอกข้อความสนทนา */}
+                <div className="mt-2 pt-2 border-t border-slate-800 shrink-0 space-y-1.5">
+                  {/* ชิปพิมพ์ด่วน */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[10px]">
+                    <span className="text-slate-400 font-bold shrink-0">พิมพ์ด่วน:</span>
+                    <button
+                      onClick={() => handleSendChatMessage('ฉันเป็นคนดีบริสุทธิ์นะ อย่าเพิ่งรีบโหวตฉันเลย!')}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+                    >
+                      🛡️ ฉันเป็นคนดี
+                    </button>
+                    <button
+                      onClick={() => handleSendChatMessage('ฉันสังเกตเห็นบางคนทำตัวเงียบผิดปกติ เช้านี้มีพิรุธจัง!')}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+                    >
+                      👀 มีคนเงียบผิดปกติ
+                    </button>
+                    <button
+                      onClick={() => handleSendChatMessage('ทุกคนอย่าเพิ่งใจร้อนนะ ฟังเหตุผลกันก่อนค่อยตัดสินใจ')}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+                    >
+                      🕊️ อย่าเพิ่งใจร้อน
+                    </button>
+                    <button
+                      onClick={() => handleSendChatMessage('ฉันมั่นใจว่าในหมู่บ้านเรามีหมาป่าซ่อนตัวอยู่แน่นอน!')}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition shrink-0 cursor-pointer"
+                    >
+                      🐺 มีหมาป่าซ่อนอยู่
+                    </button>
+                  </div>
+
+                  {/* ช่องพิมพ์ข้อความคุยกับบอท */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSendChatMessage()
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={userChatInput}
+                      onChange={(e) => setUserChatInput(e.target.value)}
+                      placeholder={
+                        userPlayer?.isAlive
+                          ? "พิมพ์ข้อความคุยกับบอทในหมู่บ้าน... (เช่น 'ฉันสงสัยบอทอเล็กซ์')"
+                          : "คุณเสียชีวิตแล้ว (วิญญาณกำลังเฝ้าดู 👻)"
+                      }
+                      disabled={!userPlayer?.isAlive}
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50 transition"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!userPlayer?.isAlive || !userChatInput.trim()}
+                      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>ส่ง</span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 overflow-y-auto max-h-[calc(100vh-340px)] p-1">
               {roster.map((player) => {
                 const isSelected = selectedTargetId === player.id
                 const votesCount = voteTally[player.id] || 0
@@ -1405,10 +1779,22 @@ function WerewolfGame({ setCurrentPage }) {
                         <span className="text-slate-400 font-medium">รอโหวต 🗳️</span>
                       )}
                     </div>
+
+                    {/* ความคิด/คำพูดของบอทในเช้านี้ */}
+                    {gameCycle === 'day' && botThoughts[player.id] && player.isAlive && !player.isUser && (
+                      <div
+                        className="mt-1 px-1.5 py-0.5 bg-amber-500/10 border border-amber-400/25 rounded text-[8.5px] text-amber-200/90 text-left line-clamp-2 leading-tight"
+                        title={botThoughts[player.id]}
+                      >
+                        <span className="font-bold text-amber-300">💬 </span>
+                        "{botThoughts[player.id]}"
+                      </div>
+                    )}
                   </div>
                 )
               })}
             </div>
+          )}
 
             {/* บันทึกเหตุการณ์ */}
             <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
