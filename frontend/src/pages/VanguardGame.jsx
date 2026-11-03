@@ -21,11 +21,12 @@ import {
   Info,
   X,
   RefreshCw,
+  Move,
 } from 'lucide-react'
 import { VANGUARD_CARDS, PRESET_DECKS } from '../data/vanguardCards'
 
 // ==========================================
-// AUDIO SYNTHESIZER (Web Audio API - ไม่มีปัญหาเรื่องโหลดไฟล์เสียง)
+// AUDIO SYNTHESIZER (Web Audio API)
 // ==========================================
 const playSoundEffect = (type) => {
   try {
@@ -37,7 +38,6 @@ const playSoundEffect = (type) => {
 
     const now = ctx.currentTime
     if (type === 'ride') {
-      // เสียงพุ่งทะยาน ปลดปล่อยพลัง ไรด์การ์ด
       osc.type = 'triangle'
       osc.frequency.setValueAtTime(220, now)
       osc.frequency.exponentialRampToValueAtTime(880, now + 0.35)
@@ -46,7 +46,6 @@ const playSoundEffect = (type) => {
       osc.start(now)
       osc.stop(now + 0.35)
     } else if (type === 'attack') {
-      // เสียงฟันดาบ / ยิงพลัง
       osc.type = 'sawtooth'
       osc.frequency.setValueAtTime(400, now)
       osc.frequency.exponentialRampToValueAtTime(100, now + 0.25)
@@ -55,18 +54,16 @@ const playSoundEffect = (type) => {
       osc.start(now)
       osc.stop(now + 0.25)
     } else if (type === 'trigger') {
-      // เสียงทริกเกอร์แตก แวววาวตื่นเต้น!
       osc.type = 'sine'
-      osc.frequency.setValueAtTime(523.25, now) // C5
-      osc.frequency.setValueAtTime(659.25, now + 0.1) // E5
-      osc.frequency.setValueAtTime(783.99, now + 0.2) // G5
-      osc.frequency.setValueAtTime(1046.5, now + 0.3) // C6
+      osc.frequency.setValueAtTime(523.25, now)
+      osc.frequency.setValueAtTime(659.25, now + 0.1)
+      osc.frequency.setValueAtTime(783.99, now + 0.2)
+      osc.frequency.setValueAtTime(1046.5, now + 0.3)
       gain.gain.setValueAtTime(0.4, now)
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5)
       osc.start(now)
       osc.stop(now + 0.5)
     } else if (type === 'damage') {
-      // เสียงระเบิดโดนดาเมจ
       osc.type = 'square'
       osc.frequency.setValueAtTime(150, now)
       osc.frequency.exponentialRampToValueAtTime(40, now + 0.3)
@@ -75,7 +72,6 @@ const playSoundEffect = (type) => {
       osc.start(now)
       osc.stop(now + 0.3)
     } else if (type === 'guard') {
-      // เสียงกางม่านพลังป้องกัน
       osc.type = 'sine'
       osc.frequency.setValueAtTime(300, now)
       osc.frequency.exponentialRampToValueAtTime(600, now + 0.2)
@@ -85,11 +81,11 @@ const playSoundEffect = (type) => {
       osc.stop(now + 0.25)
     }
   } catch {
-    // AudioContext blocked by browser autoplay policy
+    // AudioContext blocked
   }
 }
 
-// Helper: ขยายเด็คจาก cardList ให้เป็นอาเรย์ 50 ใบแยกอิสระ
+// Helper: สร้างเด็ค 50 ใบพร้อมสับ
 const buildFullDeckArray = (preset) => {
   const cards = []
   preset.cardList.forEach((item) => {
@@ -106,7 +102,6 @@ const buildFullDeckArray = (preset) => {
       }
     }
   })
-  // สับการ์ด (Fisher-Yates Shuffle)
   for (let i = cards.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[cards[i], cards[j]] = [cards[j], cards[i]]
@@ -115,27 +110,19 @@ const buildFullDeckArray = (preset) => {
 }
 
 export default function VanguardGame({ currentUser }) {
-  // Navigation Tabs: 'arena' (สนามประลอง), 'deckbuilder' (ระบบจัดเด็ค), 'rulebook' (กติกา V-Series)
   const [activeTab, setActiveTab] = useState('arena')
-
-  // Sound Mute Toggle
   const [soundEnabled, setSoundEnabled] = useState(true)
-
-  // Card detail modal
-  const [inspectedCard, setInspectedCard] = useState(null)
+  const [hoveredCard, setHoveredCard] = useState(null)
 
   // ==========================================
   // DECK BUILDER STATE
   // ==========================================
   const [selectedClan, setSelectedClan] = useState('Royal Paladin')
   const [filterGrade, setFilterGrade] = useState('all')
-  const [searchKeyword, setSearchKeyword] = useState('')
   const [customDeckCards, setCustomDeckCards] = useState(() => {
-    // ค่าเริ่มต้นเป็น Royal Paladin V-TD01
     return [...PRESET_DECKS.royal_paladin.cardList]
   })
 
-  // คำนวณสถิติของเด็คปัจจุบัน
   const deckStats = {
     totalCards: customDeckCards.reduce((acc, c) => acc + c.count, 0),
     triggers: customDeckCards.reduce((acc, c) => {
@@ -169,25 +156,24 @@ export default function VanguardGame({ currentUser }) {
     deckStats.triggers === 16 &&
     deckStats.healTriggers <= 4
 
-  // เพิ่มการ์ดเข้าเด็ค
   const handleAddCardToDeck = (cardId) => {
     const existing = customDeckCards.find((c) => c.cardId === cardId)
     const cardData = VANGUARD_CARDS.find((c) => c.id === cardId)
 
     if (deckStats.totalCards >= 50) {
-      alert('เด็คครบ 50 ใบแล้ว ไม่สามารถเพิ่มได้อีก')
+      alert('เด็คครบ 50 ใบแล้ว')
       return
     }
     if (existing && existing.count >= 4) {
-      alert('การ์ดชื่อเดียวกันใส่ได้ไม่เกิน 4 ใบตามกฎ Official')
+      alert('การ์ดชื่อเดียวกันใส่ได้ไม่เกิน 4 ใบ')
       return
     }
     if (cardData.triggerType === 'Heal' && deckStats.healTriggers >= 4) {
-      alert('Heal Trigger ใส่ได้สูงสุด 4 ใบเท่านั้น')
+      alert('Heal Trigger ใส่ได้สูงสุด 4 ใบ')
       return
     }
     if (cardData.triggerType && deckStats.triggers >= 16) {
-      alert('Trigger ใส่ได้รวมกันไม่เกิน 16 ใบพอดี')
+      alert('Trigger ใส่ได้ไม่เกิน 16 ใบพอดี')
       return
     }
 
@@ -202,7 +188,6 @@ export default function VanguardGame({ currentUser }) {
     }
   }
 
-  // ลดการ์ดออกจากเด็ค
   const handleRemoveCardFromDeck = (cardId) => {
     const existing = customDeckCards.find((c) => c.cardId === cardId)
     if (!existing) return
@@ -217,7 +202,6 @@ export default function VanguardGame({ currentUser }) {
     }
   }
 
-  // โหลดพรีเซ็ตเด็ค
   const handleLoadPreset = (key) => {
     const preset = PRESET_DECKS[key]
     if (preset) {
@@ -229,12 +213,12 @@ export default function VanguardGame({ currentUser }) {
   // ==========================================
   // BATTLE ARENA ENGINE (V-Series Official Rules)
   // ==========================================
-  const [matchStatus, setMatchStatus] = useState('idle') // 'idle', 'playing', 'victory', 'defeat'
-  const [turnPlayer, setTurnPlayer] = useState('player') // 'player', 'opponent'
+  const [matchStatus, setMatchStatus] = useState('idle')
+  const [turnPlayer, setTurnPlayer] = useState('player')
   const [turnCount, setTurnCount] = useState(1)
-  const [currentPhase, setCurrentPhase] = useState('STAND') // 'STAND', 'DRAW', 'RIDE', 'MAIN', 'BATTLE', 'END'
+  const [currentPhase, setCurrentPhase] = useState('STAND')
 
-  // Log ข้อความความเคลื่อนไหวในสนาม
+  // Combat Log
   const [battleLogs, setBattleLogs] = useState([])
   const logBattle = (msg) => {
     setBattleLogs((prev) => [
@@ -243,11 +227,15 @@ export default function VanguardGame({ currentUser }) {
     ])
   }
 
-  // ผู้เล่น (Player) State
+  // Drag and Drop State
+  const [draggedCard, setDraggedCard] = useState(null)
+  const [dragOverCircle, setDragOverCircle] = useState(null)
+
+  // Player State
   const [playerDeck, setPlayerDeck] = useState([])
   const [playerHand, setPlayerHand] = useState([])
   const [playerDrop, setPlayerDrop] = useState([])
-  const [playerDamage, setPlayerDamage] = useState([]) // Array of cards in damage zone { ...card, isFaceDown: false }
+  const [playerDamage, setPlayerDamage] = useState([])
   const [playerSoul, setPlayerSoul] = useState([])
   const [playerVanguard, setPlayerVanguard] = useState(null)
   const [playerRearguards, setPlayerRearguards] = useState({
@@ -258,10 +246,10 @@ export default function VanguardGame({ currentUser }) {
     br: null, // Back-Right
   })
   const [playerGuardian, setPlayerGuardian] = useState([])
-  const [playerGiftCount, setPlayerGiftCount] = useState(0) // Imaginary Gift: Force markers
-  const [playerTriggerZone, setPlayerTriggerZone] = useState(null) // การ์ดที่เปิดแสดงตอนเช็กทริกเกอร์
+  const [playerGiftCount, setPlayerGiftCount] = useState(0)
+  const [playerTriggerZone, setPlayerTriggerZone] = useState(null)
 
-  // คู่ต่อสู้ (AI Opponent) State
+  // Opponent (AI) State
   const [oppDeck, setOppDeck] = useState([])
   const [oppHand, setOppHand] = useState([])
   const [oppDrop, setOppDrop] = useState([])
@@ -279,26 +267,21 @@ export default function VanguardGame({ currentUser }) {
   const [oppGiftCount, setOppGiftCount] = useState(0)
   const [oppTriggerZone, setOppTriggerZone] = useState(null)
 
-  // Combat State
-  const [selectedAttackerCircle, setSelectedAttackerCircle] = useState(null) // 'vc', 'fl', 'fr'
-  const [selectedTargetCircle, setSelectedTargetCircle] = useState(null) // 'opp-vc', 'opp-fl', 'opp-fr'
-  const [boostedCircle, setBoostedCircle] = useState(null) // 'bc', 'bl', 'br'
-  const [combatStep, setCombatStep] = useState('none') // 'none', 'attacking', 'guarding', 'driveCheck', 'damageCheck'
-  const [triggerEffectTarget, setTriggerEffectTarget] = useState(null)
+  // Combat Targeting
+  const [selectedAttackerCircle, setSelectedAttackerCircle] = useState(null)
+  const [selectedTargetCircle, setSelectedTargetCircle] = useState(null)
 
-  // เริ่มต้นแมตช์ใหม่ (Start New Game)
+  // เริ่มแมตช์ใหม่
   const handleStartGame = (playerPresetKey = 'royal_paladin', oppPresetKey = 'kagero') => {
     const pDeck = buildFullDeckArray(PRESET_DECKS[playerPresetKey])
     const oDeck = buildFullDeckArray(PRESET_DECKS[oppPresetKey])
 
-    // ค้นหา First Vanguard (G0) เพื่อวางคว่ำหน้าในช่อง VG ก่อนเริ่มเกม
     const pFVIndex = pDeck.findIndex((c) => c.cardType === 'First Vanguard' || c.grade === 0)
     const oFVIndex = oDeck.findIndex((c) => c.cardType === 'First Vanguard' || c.grade === 0)
 
     const pFV = pDeck.splice(pFVIndex >= 0 ? pFVIndex : 0, 1)[0]
     const oFV = oDeck.splice(oFVIndex >= 0 ? oFVIndex : 0, 1)[0]
 
-    // จั่วการ์ดเริ่มต้นคนละ 5 ใบ
     const pHand = pDeck.splice(0, 5)
     const oHand = oDeck.splice(0, 5)
 
@@ -325,18 +308,19 @@ export default function VanguardGame({ currentUser }) {
 
     setTurnPlayer('player')
     setTurnCount(1)
-    setCurrentPhase('MAIN') // เทิร์นแรกเริ่มต้นที่ Main Phase
+    setCurrentPhase('MAIN')
     setMatchStatus('playing')
     setBattleLogs([
       '⚔️ สแตนด์อัพ! เดอะ แวนการ์ด! (Stand Up! The Vanguard!)',
-      `👤 ฝ่ายคุณ: ${pFV.nameTh} (Grade ${pFV.grade})`,
-      `🤖 ฝ่ายศัตรู: ${oFV.nameTh} (Grade ${oFV.grade})`,
+      '💡 คำแนะนำ: ลากการ์ดจากมือมาวางที่วงกลมเพื่อไรด์ (VC) หรือคอลเรียร์การ์ด (ทุกช่อง หน้า-หลัง)',
+      `👤 ฝ่ายคุณ: ${pFV.nameTh} (G${pFV.grade})`,
+      `🤖 ฝ่ายศัตรู: ${oFV.nameTh} (G${oFV.grade})`,
     ])
 
     if (soundEnabled) playSoundEffect('ride')
   }
 
-  // ตรวจสอบเงื่อนไขจบเกม
+  // เช็กจบเกม
   useEffect(() => {
     if (matchStatus === 'playing') {
       if (playerDamage.length >= 6) {
@@ -347,7 +331,7 @@ export default function VanguardGame({ currentUser }) {
         logBattle('🏆 ยินดีด้วย! คุณทำดาเมจศัตรูครบ 6 แดม คว้าชัยชนะ!')
       } else if (playerDeck.length === 0) {
         setMatchStatus('defeat')
-        logBattle('💀 การ์ดในกองของคุณหมด (Deck Out) พ่ายแพ้การประลอง!')
+        logBattle('💀 กองการ์ดของคุณหมด (Deck Out) พ่ายแพ้!')
       } else if (oppDeck.length === 0) {
         setMatchStatus('victory')
         logBattle('🏆 กองการ์ดของศัตรูหมด (Deck Out) คุณชนะ!')
@@ -355,145 +339,170 @@ export default function VanguardGame({ currentUser }) {
     }
   }, [playerDamage, oppDamage, playerDeck, oppDeck, matchStatus])
 
-  // คำนวณพลังรวมของช่อง Player
+  // คำนวณพลังรวม
   const getCirclePower = (circleKey) => {
-    let unit = null
-    let isVG = false
-    if (circleKey === 'vc') {
-      unit = playerVanguard
-      isVG = true
-    } else {
-      unit = playerRearguards[circleKey]
-    }
+    let unit = circleKey === 'vc' ? playerVanguard : playerRearguards[circleKey]
     if (!unit) return 0
-
     let total = unit.power + (unit.tempPowerBonus || 0)
-    // ถ้ามี Force Gift อยู่ที่ช่องนี้ +10,000 ต่อ 1 มาร์กเกอร์
-    if (isVG && playerGiftCount > 0) {
+    if (circleKey === 'vc' && playerGiftCount > 0) {
       total += playerGiftCount * 10000
     }
     return total
   }
 
-  // คำนวณพลังรวมของช่อง Opponent
   const getOppCirclePower = (circleKey) => {
-    let unit = null
-    let isVG = false
-    if (circleKey === 'vc') {
-      unit = oppVanguard
-      isVG = true
-    } else {
-      unit = oppRearguards[circleKey]
-    }
+    let unit = circleKey === 'vc' ? oppVanguard : oppRearguards[circleKey]
     if (!unit) return 0
-
     let total = unit.power + (unit.tempPowerBonus || 0)
-    if (isVG && oppGiftCount > 0) {
+    if (circleKey === 'vc' && oppGiftCount > 0) {
       total += oppGiftCount * 10000
     }
     return total
   }
 
-  // ไรด์ยูนิตทับแวนการ์ด (Ride)
-  const handleRide = (card, handIndex) => {
-    if (turnPlayer !== 'player') return
-    if (currentPhase !== 'RIDE' && currentPhase !== 'MAIN') {
-      alert('คุณสามารถไรด์การ์ดได้ใน Ride Phase หรือ Main Phase เท่านั้น')
-      return
-    }
+  // ==========================================
+  // DRAG & DROP LOGIC (ลากการ์ดจากมือลงสนาม)
+  // ==========================================
+  const handleDragStart = (e, card, index) => {
+    setDraggedCard({ ...card, handIndex: index })
+    e.dataTransfer.setData('text/plain', JSON.stringify({ cardId: card.id, handIndex: index }))
+    e.dataTransfer.effectAllowed = 'move'
+  }
 
+  const handleDragOver = (e, circleKey) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverCircle !== circleKey) {
+      setDragOverCircle(circleKey)
+    }
+  }
+
+  const handleDragLeave = (e) => {
+    setDragOverCircle(null)
+  }
+
+  const handleDropOnCircle = (e, circleKey) => {
+    e.preventDefault()
+    setDragOverCircle(null)
+    if (!draggedCard) return
+
+    const card = draggedCard
+    const handIndex = draggedCard.handIndex
+
+    if (circleKey === 'vc') {
+      // ทำการ RIDE ลงช่อง Vanguard
+      handleExecuteRide(card, handIndex)
+    } else if (circleKey === 'gc') {
+      // วางป้องกันในช่อง GUARD
+      handleExecuteGuard(card, handIndex)
+    } else if (['fl', 'fr', 'bl', 'bc', 'br'].includes(circleKey)) {
+      // ทำการ CALL ลงช่อง Rear-Guard (ทั้งแถวหน้า FL, FR และแถวหลัง BL, BC, BR!)
+      handleExecuteCall(card, handIndex, circleKey)
+    }
+    setDraggedCard(null)
+  }
+
+  // ดำเนินการ RIDE
+  const handleExecuteRide = (card, handIndex) => {
+    if (turnPlayer !== 'player') return
     const currentGrade = playerVanguard ? playerVanguard.grade : 0
+
     if (card.grade !== currentGrade && card.grade !== currentGrade + 1) {
       alert(
-        `ไม่สามารถไรด์ได้! เกรดต้องเป็นเกรดเดิม (${currentGrade}) หรือสูงกว่า 1 เกรด (${currentGrade + 1})`
+        `ไม่สามารถไรด์ได้! เกรดของการ์ดต้องเป็นเกรดเดิม (${currentGrade}) หรือสูงกว่า 1 เกรด (${currentGrade + 1})`
       )
       return
     }
 
-    // เอาการ์ดออกจากมือ
     const newHand = [...playerHand]
     newHand.splice(handIndex, 1)
     setPlayerHand(newHand)
 
-    // ตัวเดิมลงไปเป็น Soul
     if (playerVanguard) {
       setPlayerSoul((prev) => [playerVanguard, ...prev])
     }
 
-    // สวมใส่การ์ดใหม่เป็นแวนการ์ด
     const newVG = { ...card, isRest: false, tempPowerBonus: 0, tempCritBonus: 0 }
     setPlayerVanguard(newVG)
 
-    // ถ้าไรด์เกรด 3 ได้รับ Imaginary Gift: Force ทันที!
     if (newVG.grade === 3 && newVG.gift === 'Force') {
       setPlayerGiftCount((prev) => prev + 1)
-      logBattle(
-        `🎁 ได้รับ Imaginary Gift: Force I! ช่อง Vanguard ได้รับ Power +10,000 ถาวร!`
-      )
+      logBattle(`🎁 ได้รับ Imaginary Gift: Force I! ช่อง Vanguard ได้รับ Power +10,000 ถาวร!`)
     }
 
-    logBattle(`✨ ไรด์! ${newVG.nameTh} (Grade ${newVG.grade}) สู่ช่องแวนการ์ด!`)
+    logBattle(`✨ ไรด์! [${newVG.nameTh}] (Grade ${newVG.grade}) สู่ช่องแวนการ์ด!`)
     if (soundEnabled) playSoundEffect('ride')
   }
 
-  // คอลการ์ดลงช่องเรียร์การ์ด (Call to Rearguard)
-  const handleCallToRear = (card, handIndex, circleKey) => {
+  // ดำเนินการ CALL ลงเรียร์การ์ด (ทั้ง 5 ช่อง: หน้า 2 หลัง 3)
+  const handleExecuteCall = (card, handIndex, circleKey) => {
     if (turnPlayer !== 'player') return
-    if (currentPhase !== 'MAIN') {
-      alert('สามารถคอลยูนิตลงสนามได้ใน Main Phase เท่านั้น')
-      return
-    }
     const currentVGGrade = playerVanguard ? playerVanguard.grade : 0
+
     if (card.grade > currentVGGrade) {
       alert(
-        `ไม่สามารถคอลเกรด ${card.grade} ได้ เพราะเกรดของแวนการ์ดคือเกรด ${currentVGGrade}`
+        `ไม่สามารถคอลเกรด ${card.grade} ได้ เพราะเกรดของแวนการ์ดในตอนนี้คือเกรด ${currentVGGrade}`
       )
       return
     }
 
-    // นำการ์ดออกจากมือ
     const newHand = [...playerHand]
     newHand.splice(handIndex, 1)
     setPlayerHand(newHand)
 
-    // ถ้ามีตัวเดิมอยู่ตรงนั้น ส่งลง Drop Zone
     const existingUnit = playerRearguards[circleKey]
     if (existingUnit) {
       setPlayerDrop((prev) => [existingUnit, ...prev])
-      logBattle(`🪦 ส่ง ${existingUnit.nameTh} ลง Drop zone เพื่อคอลตัวใหม่`)
+      logBattle(`🪦 ส่ง [${existingUnit.nameTh}] ลง Drop zone เพื่อคอลตัวใหม่`)
     }
 
-    // คอลตัวใหม่ลงช่อง
     const newUnit = {
       ...card,
       isRest: false,
       tempPowerBonus: 0,
       tempCritBonus: 0,
     }
+
     setPlayerRearguards((prev) => ({
       ...prev,
       [circleKey]: newUnit,
     }))
 
-    logBattle(`⚔️ คอล ${newUnit.nameTh} (G${newUnit.grade}) ลงช่อง ${circleKey.toUpperCase()}`)
+    const circleName = {
+      fl: 'แถวหน้า-ซ้าย (Front-Left)',
+      fr: 'แถวหน้า-ขวา (Front-Right)',
+      bl: 'แถวหลัง-ซ้าย (Back-Left)',
+      bc: 'แถวหลัง-กลาง (Back-Center)',
+      br: 'แถวหลัง-ขวา (Back-Right)',
+    }[circleKey]
+
+    logBattle(`⚔️ คอล [${newUnit.nameTh}] (G${newUnit.grade}) ลงช่อง ${circleName}!`)
     if (soundEnabled) playSoundEffect('attack')
   }
 
-  // การสั่งโจมตี (Declare Attack)
+  // ดำเนินการ GUARD
+  const handleExecuteGuard = (card, handIndex) => {
+    const newHand = [...playerHand]
+    newHand.splice(handIndex, 1)
+    setPlayerHand(newHand)
+    setPlayerDrop((prev) => [card, ...prev])
+    logBattle(`🛡️ ใช้ [${card.nameTh}] การ์ดป้องกัน (+${(card.shield || 5000) / 1000}k Shield)!`)
+    if (soundEnabled) playSoundEffect('guard')
+  }
+
+  // สั่งโจมตี
   const handleDeclareAttack = (attackerKey) => {
     if (turnPlayer !== 'player' || currentPhase !== 'BATTLE') return
 
-    const attacker =
-      attackerKey === 'vc' ? playerVanguard : playerRearguards[attackerKey]
+    const attacker = attackerKey === 'vc' ? playerVanguard : playerRearguards[attackerKey]
     if (!attacker) return
     if (attacker.isRest) {
       alert('ยูนิตนี้โจมตีไปแล้วในเทิร์นนี้ (Rest อยู่)')
       return
     }
 
-    // เฉพาะแถวหน้า (VC, FL, FR) เท่านั้นที่ตีได้
     if (attackerKey !== 'vc' && attackerKey !== 'fl' && attackerKey !== 'fr') {
-      alert('ยูนิตแถวหลังไม่สามารถโจมตีได้ ทำหน้าที่ได้แค่บูสต์ (Boost)')
+      alert('ยูนิตแถวหลังทำหน้าที่บูสต์ (Boost) ให้แถวหน้าเท่านั้น ไม่สามารถสั่งโจมตีเดี่ยวได้')
       return
     }
 
@@ -503,7 +512,7 @@ export default function VanguardGame({ currentUser }) {
     )
   }
 
-  // เลือกเป้าหมายและเริ่มคอมแบท (Execute Combat)
+  // เลือกเป้าหมายและตัดสินผล
   const handleSelectTarget = (targetKey) => {
     if (!selectedAttackerCircle) return
 
@@ -512,7 +521,6 @@ export default function VanguardGame({ currentUser }) {
         ? playerVanguard
         : playerRearguards[selectedAttackerCircle]
 
-    // ตั้งค่า Rest ใหักับตัวตี
     if (selectedAttackerCircle === 'vc') {
       setPlayerVanguard((prev) => ({ ...prev, isRest: true }))
     } else {
@@ -526,55 +534,44 @@ export default function VanguardGame({ currentUser }) {
     }
 
     setSelectedTargetCircle(targetKey)
-    setCombatStep('driveCheck')
 
     let totalAtk = getCirclePower(selectedAttackerCircle)
-    // ตรวจสอบตัวบูสต์ข้างหลัง
+
+    // บูสต์จากแถวหลังอัตโนมัติ
     let boostUnit = null
     if (selectedAttackerCircle === 'vc' && playerRearguards.bc && !playerRearguards.bc.isRest) {
       boostUnit = playerRearguards.bc
-      setPlayerRearguards((prev) => ({
-        ...prev,
-        bc: { ...prev.bc, isRest: true },
-      }))
+      setPlayerRearguards((prev) => ({ ...prev, bc: { ...prev.bc, isRest: true } }))
     } else if (selectedAttackerCircle === 'fl' && playerRearguards.bl && !playerRearguards.bl.isRest) {
       boostUnit = playerRearguards.bl
-      setPlayerRearguards((prev) => ({
-        ...prev,
-        bl: { ...prev.bl, isRest: true },
-      }))
+      setPlayerRearguards((prev) => ({ ...prev, bl: { ...prev.bl, isRest: true } }))
     } else if (selectedAttackerCircle === 'fr' && playerRearguards.br && !playerRearguards.br.isRest) {
       boostUnit = playerRearguards.br
-      setPlayerRearguards((prev) => ({
-        ...prev,
-        br: { ...prev.br, isRest: true },
-      }))
+      setPlayerRearguards((prev) => ({ ...prev, br: { ...prev.br, isRest: true } }))
     }
 
     if (boostUnit) {
       totalAtk += boostUnit.power
       logBattle(
-        `⚡ ได้รับการบูสต์จาก [${boostUnit.nameTh}] (+${boostUnit.power})! พลังโจมตีรวม: ${totalAtk}`
+        `⚡ ได้รับการบูสต์จาก [${boostUnit.nameTh}] (+${boostUnit.power})! พลังรวม: ${totalAtk}`
       )
     }
 
     if (soundEnabled) playSoundEffect('attack')
     logBattle(
-      `💥 [${attacker.nameTh}] บุกโจมตี [${targetKey === 'opp-vc' ? 'แวนการ์ดศัตรู' : 'เรียร์การ์ดศัตรู'}]! (พลังโจมตี: ${totalAtk})`
+      `💥 [${attacker.nameTh}] โจมตี [${targetKey === 'opp-vc' ? 'แวนการ์ดศัตรู' : 'เรียร์การ์ดศัตรู'}]! (พลัง: ${totalAtk})`
     )
 
-    // ถ้าตัวตีคือแวนการ์ด ทำ Drive Check ทันที!
     if (selectedAttackerCircle === 'vc') {
       const driveCount = attacker.skillType === 'Twin Drive' ? 2 : 1
-      logBattle(`🎲 แวนการ์ดโจมตี! ทำการ Drive Check (${driveCount} ครั้ง)!`)
+      logBattle(`🎲 แวนการ์ดโจมตี! Drive Check (${driveCount} ครั้ง)!`)
       performDriveCheck(driveCount, totalAtk, targetKey)
     } else {
-      // เรียร์การ์ดตี ไม่มีไดร์ฟเช็ก ข้ามไปคิดดาเมจ
       resolveDamageStep(totalAtk, targetKey, attacker.critical || 1)
     }
   }
 
-  // ระบบ Drive Check
+  // Drive Check
   const performDriveCheck = (drivesRemaining, currentAtk, targetKey) => {
     if (playerDeck.length === 0) return
 
@@ -582,8 +579,6 @@ export default function VanguardGame({ currentUser }) {
     const checkCard = newDeck.shift()
     setPlayerDeck(newDeck)
     setPlayerTriggerZone(checkCard)
-
-    // เพิ่มการ์ดเข้ามือหลังไดร์ฟเช็ก
     setPlayerHand((prev) => [...prev, checkCard])
 
     let updatedAtk = currentAtk
@@ -591,9 +586,7 @@ export default function VanguardGame({ currentUser }) {
 
     if (checkCard.triggerType) {
       if (soundEnabled) playSoundEffect('trigger')
-      logBattle(
-        `🌟 TRIGGER CHECKED!! พบ [${checkCard.triggerType.toUpperCase()} TRIGGER] จาก ${checkCard.nameTh}!`
-      )
+      logBattle(`🌟 TRIGGER CHECK!! [${checkCard.triggerType.toUpperCase()} TRIGGER] จาก ${checkCard.nameTh}!`)
 
       if (checkCard.triggerType === 'Critical') {
         updatedAtk += 10000
@@ -613,13 +606,11 @@ export default function VanguardGame({ currentUser }) {
           const healed = playerDamage.pop()
           setPlayerDrop((prev) => [healed, ...prev])
           setPlayerDamage([...playerDamage])
-          logBattle(`💚 Heal Trigger: Power +10,000 & ฟื้นฟู 1 ดาเมจลง Drop Zone!`)
-        } else {
-          logBattle(`💚 Heal Trigger: Power +10,000 (ดาเมจไม่มากกว่าศัตรู ไม่ฮีล)`)
+          logBattle(`💚 Heal Trigger: Power +10,000 & ฟื้นฟู 1 ดาเมจ!`)
         }
       }
     } else {
-      logBattle(`⚪ Drive Check: ${checkCard.nameTh} (ไม่มีทริกเกอร์)`)
+      logBattle(`⚪ Drive Check: [${checkCard.nameTh}] (ไม่มีทริกเกอร์)`)
     }
 
     if (drivesRemaining > 1) {
@@ -628,41 +619,26 @@ export default function VanguardGame({ currentUser }) {
       }, 1100)
     } else {
       setTimeout(() => {
-        resolveDamageStep(
-          updatedAtk,
-          targetKey,
-          (playerVanguard.critical || 1) + addedCrit
-        )
+        resolveDamageStep(updatedAtk, targetKey, (playerVanguard.critical || 1) + addedCrit)
       }, 900)
     }
   }
 
-  // ตัดสินผลดาเมจ (Damage Step)
+  // Damage Step
   const resolveDamageStep = (attackerPower, targetKey, critCount) => {
     let defenderPower = 0
-    if (targetKey === 'opp-vc') {
-      defenderPower = getOppCirclePower('vc')
-    } else if (targetKey === 'opp-fl') {
-      defenderPower = getOppCirclePower('fl')
-    } else if (targetKey === 'opp-fr') {
-      defenderPower = getOppCirclePower('fr')
-    }
+    if (targetKey === 'opp-vc') defenderPower = getOppCirclePower('vc')
+    else if (targetKey === 'opp-fl') defenderPower = getOppCirclePower('fl')
+    else if (targetKey === 'opp-fr') defenderPower = getOppCirclePower('fr')
 
-    logBattle(
-      `⚔️ วัดพลัง: ฝ่ายรุก ${attackerPower} VS ฝ่ายรับ ${defenderPower}`
-    )
+    logBattle(`⚔️ วัดพลัง: ฝ่ายรุก ${attackerPower} VS ฝ่ายรับ ${defenderPower}`)
 
     if (attackerPower >= defenderPower) {
       if (soundEnabled) playSoundEffect('damage')
-
       if (targetKey === 'opp-vc') {
-        logBattle(
-          `💥 โจมตีสำเร็จ (HIT)! แวนการ์ดศัตรูได้รับ ${critCount} ดาเมจ!`
-        )
-        // ศัตรูเปิด Damage Check
+        logBattle(`💥 HIT! แวนการ์ดศัตรูได้รับ ${critCount} ดาเมจ!`)
         performOppDamageCheck(critCount)
       } else {
-        // ทำลายเรียร์การ์ดศัตรู (Retire)
         const circle = targetKey.replace('opp-', '')
         const retired = oppRearguards[circle]
         if (retired) {
@@ -676,13 +652,10 @@ export default function VanguardGame({ currentUser }) {
       logBattle(`🛡️ โจมตีไม่สำเร็จ! พลังป้องกันของศัตรูสูงกว่า`)
     }
 
-    // รีเซ็ตสถานะการโจมตี
     setSelectedAttackerCircle(null)
     setSelectedTargetCircle(null)
-    setCombatStep('none')
   }
 
-  // ศัตรูเปิด Damage Check
   const performOppDamageCheck = (damagesRemaining) => {
     if (damagesRemaining <= 0 || oppDeck.length === 0) return
 
@@ -690,17 +663,11 @@ export default function VanguardGame({ currentUser }) {
     const damCard = newDeck.shift()
     setOppDeck(newDeck)
     setOppTriggerZone(damCard)
-
     setOppDamage((prev) => [...prev, { ...damCard, isFaceDown: false }])
 
     if (damCard.triggerType) {
       if (soundEnabled) playSoundEffect('trigger')
-      logBattle(
-        `🚨 ศัตรูเปิดพบ [${damCard.triggerType.toUpperCase()} TRIGGER] จากดาเมจเช็ก!`
-      )
-      if (damCard.triggerType === 'Heal' && oppDamage.length >= playerDamage.length) {
-        logBattle(`💚 ศัตรูฮีล 1 ดาเมจ!`)
-      }
+      logBattle(`🚨 ศัตรูเปิดพบ [${damCard.triggerType.toUpperCase()} TRIGGER] จากดาเมจเช็ก!`)
     }
 
     if (damagesRemaining > 1) {
@@ -710,12 +677,11 @@ export default function VanguardGame({ currentUser }) {
     }
   }
 
-  // เปลี่ยนเฟส (Next Phase)
+  // เปลี่ยนเฟส
   const handleNextPhase = () => {
     if (turnPlayer !== 'player') return
 
     if (currentPhase === 'STAND') {
-      // สแตนด์การ์ดทุกใบ
       if (playerVanguard) setPlayerVanguard((prev) => ({ ...prev, isRest: false }))
       setPlayerRearguards((prev) => {
         const next = { ...prev }
@@ -727,7 +693,6 @@ export default function VanguardGame({ currentUser }) {
       setCurrentPhase('DRAW')
       logBattle('🔄 Stand Phase: สแตนด์ยูนิตทุกใบในแนวตั้ง')
     } else if (currentPhase === 'DRAW') {
-      // จั่วการ์ด 1 ใบ
       if (playerDeck.length > 0) {
         const newDeck = [...playerDeck]
         const drawn = newDeck.shift()
@@ -735,15 +700,11 @@ export default function VanguardGame({ currentUser }) {
         setPlayerHand((prev) => [...prev, drawn])
         logBattle(`📥 Draw Phase: จั่ว [${drawn.nameTh}] ขึ้นมือ`)
       }
-      setCurrentPhase('RIDE')
-    } else if (currentPhase === 'RIDE') {
       setCurrentPhase('MAIN')
-      logBattle('⚙️ Main Phase: คอลเรียร์การ์ด หรือจัดตำแหน่งยูนิต')
     } else if (currentPhase === 'MAIN') {
       setCurrentPhase('BATTLE')
       logBattle('⚔️ Battle Phase: สั่งแถวหน้าโจมตีศัตรู!')
     } else if (currentPhase === 'BATTLE') {
-      // จบเทิร์น ส่งต่อให้ AI
       setCurrentPhase('END')
       logBattle('🏁 End Phase: จบเทิร์นของผู้เล่น สลับสู่เทิร์นศัตรู')
       setTimeout(() => {
@@ -752,12 +713,12 @@ export default function VanguardGame({ currentUser }) {
     }
   }
 
-  // บอท AI เล่นอัตโนมัติ (AI Opponent Turn Simulation)
+  // AI Turn
   const handleAITurn = () => {
     setTurnPlayer('opponent')
     logBattle('🤖 เริ่มต้นเทิร์นของคู่ต่อสู้ (AI Turn)...')
 
-    // 1. Stand
+    // Stand
     setOppVanguard((prev) => (prev ? { ...prev, isRest: false } : prev))
     setOppRearguards((prev) => {
       const next = { ...prev }
@@ -767,7 +728,7 @@ export default function VanguardGame({ currentUser }) {
       return next
     })
 
-    // 2. Draw
+    // Draw
     let newOppDeck = [...oppDeck]
     let newOppHand = [...oppHand]
     if (newOppDeck.length > 0) {
@@ -778,12 +739,10 @@ export default function VanguardGame({ currentUser }) {
       logBattle(`🤖 ศัตรูจั่วการ์ด 1 ใบ`)
     }
 
-    // 3. Ride Check
+    // Ride Check
     setTimeout(() => {
       const curGrade = oppVanguard ? oppVanguard.grade : 0
-      const rideCandidateIndex = newOppHand.findIndex(
-        (c) => c.grade === curGrade + 1
-      )
+      const rideCandidateIndex = newOppHand.findIndex((c) => c.grade === curGrade + 1)
       if (rideCandidateIndex >= 0) {
         const cardToRide = newOppHand.splice(rideCandidateIndex, 1)[0]
         setOppSoul((prev) => (oppVanguard ? [oppVanguard, ...prev] : prev))
@@ -798,7 +757,7 @@ export default function VanguardGame({ currentUser }) {
         if (soundEnabled) playSoundEffect('ride')
       }
 
-      // 4. Call Check
+      // Call Check (AI calls front and back)
       const callCandidates = newOppHand.filter(
         (c) => c.grade <= (oppVanguard ? oppVanguard.grade : 1) && !c.triggerType
       )
@@ -811,54 +770,34 @@ export default function VanguardGame({ currentUser }) {
           ...prev,
           fl: { ...toCall, isRest: false },
         }))
-        logBattle(`⚔️ ศัตรูคอล [${toCall.nameTh}] ลงช่องหน้าซ้าย`)
+        logBattle(`⚔️ ศัตรูคอล [${toCall.nameTh}] ลงช่องแถวหน้า`)
       }
 
-      // 5. AI Attack Step
+      // Attack
       setTimeout(() => {
         logBattle(`💥 แวนการ์ดศัตรู [${oppVanguard ? oppVanguard.nameTh : 'VG'}] บุกโจมตีแวนการ์ดของคุณ!`)
         setOppVanguard((prev) => (prev ? { ...prev, isRest: true } : prev))
 
-        // AI Drive Check
         if (newOppDeck.length > 0) {
           const driveCard = newOppDeck.shift()
           setOppDeck([...newOppDeck])
           setOppTriggerZone(driveCard)
           setOppHand((prev) => [...prev, driveCard])
-          logBattle(`🎲 ศัตรู Drive Check: ${driveCard.nameTh}`)
-
-          if (driveCard.triggerType) {
-            if (soundEnabled) playSoundEffect('trigger')
-            logBattle(`🚨 ศัตรูติด [${driveCard.triggerType.toUpperCase()} TRIGGER]!`)
-          }
+          logBattle(`🎲 ศัตรู Drive Check: [${driveCard.nameTh}]`)
         }
 
-        // ผู้เล่นรับดาเมจ 1 แดม
         setTimeout(() => {
           if (playerDeck.length > 0) {
             const pDeck = [...playerDeck]
             const pDamCard = pDeck.shift()
             setPlayerDeck(pDeck)
             setPlayerTriggerZone(pDamCard)
-            setPlayerDamage((prev) => [
-              ...prev,
-              { ...pDamCard, isFaceDown: false },
-            ])
+            setPlayerDamage((prev) => [...prev, { ...pDamCard, isFaceDown: false }])
 
             if (soundEnabled) playSoundEffect('damage')
-            logBattle(
-              `💔 แวนการ์ดของคุณได้รับ 1 ดาเมจ! เปิด Damage Check: [${pDamCard.nameTh}]`
-            )
-
-            if (pDamCard.triggerType) {
-              if (soundEnabled) playSoundEffect('trigger')
-              logBattle(
-                `🌟 คุณเปิดพบ [${pDamCard.triggerType.toUpperCase()} TRIGGER] ในดาเมจเช็ก!`
-              )
-            }
+            logBattle(`💔 แวนการ์ดของคุณได้รับ 1 ดาเมจ! Damage Check: [${pDamCard.nameTh}]`)
           }
 
-          // คืนสิทธิ์ให้ผู้เล่น
           setTimeout(() => {
             setTurnPlayer('player')
             setTurnCount((c) => c + 1)
@@ -866,25 +805,70 @@ export default function VanguardGame({ currentUser }) {
             logBattle('🟢 จบเทิร์นศัตรู! กลับสู่เทิร์นของผู้เล่น กด "เปลี่ยนเฟส" เพื่อ Stand')
           }, 1000)
         }, 1200)
-      }, 1500)
+      }, 1400)
     }, 1200)
   }
 
-  // คว่ำ / หงาย การ์ดดาเมจสำหรับจ่าย Counter Blast (CB)
   const toggleDamageFaceDown = (index) => {
     setPlayerDamage((prev) =>
-      prev.map((card, i) =>
-        i === index ? { ...card, isFaceDown: !card.isFaceDown } : card
-      )
+      prev.map((card, i) => (i === index ? { ...card, isFaceDown: !card.isFaceDown } : card))
+    )
+  }
+
+  // Component เรนเดอร์การ์ดขนาดเล็กพร้อมรูปการ์ดจริง
+  const RenderCardItem = ({ card, isRest, showPower = true, isDragging = false }) => {
+    if (!card) return null
+    return (
+      <div
+        className={`w-full h-full relative rounded-xl overflow-hidden shadow-md flex flex-col justify-between transition-transform duration-200 select-none ${
+          isRest ? 'rotate-90 scale-90' : ''
+        } ${isDragging ? 'opacity-40' : ''}`}
+        onMouseEnter={() => setHoveredCard(card)}
+        onMouseLeave={() => setHoveredCard(null)}
+      >
+        {/* รูปภาพการ์ดจริง (Official Card Art) */}
+        <img
+          src={card.artUrl}
+          alt={card.nameTh}
+          className="w-full h-full object-cover object-top absolute inset-0 rounded-xl pointer-events-none"
+          onError={(e) => {
+            e.target.onerror = null
+            e.target.src = '/vanguard/card-back.png'
+          }}
+        />
+
+        {/* แถบ Overlay สรุปเกรดและพลัง (เพื่อให้มองเห็นชัดในสนาม) */}
+        <div className="relative z-10 p-1 flex justify-between items-center bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+          <span className="w-5 h-5 rounded-full bg-cyan-950/90 border border-cyan-400 text-cyan-200 font-black text-[10px] flex items-center justify-center shadow">
+            {card.grade}
+          </span>
+          {card.shield > 0 && (
+            <span className="px-1 py-0.2 rounded bg-amber-950/80 border border-amber-400 text-amber-200 font-bold text-[9px]">
+              +{card.shield / 1000}k
+            </span>
+          )}
+        </div>
+
+        {showPower && (
+          <div className="relative z-10 p-1 flex justify-between items-center bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+            <span className="text-[10px] font-black text-yellow-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+              {card.power + (card.tempPowerBonus || 0)}
+            </span>
+            <span className="text-[9px] text-slate-200 font-bold truncate max-w-[55px]">
+              {card.nameTh}
+            </span>
+          </div>
+        )}
+      </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none">
       {/* ======================================================== */}
-      {/* TOP HEADER: NAVIGATION & STATUS BAR                     */}
+      {/* TOP HEADER                                               */}
       {/* ======================================================== */}
-      <header className="bg-slate-900/90 backdrop-blur-md border-b border-cyan-800/40 px-4 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30 shadow-lg">
+      <header className="bg-slate-900/90 backdrop-blur-md border-b border-cyan-800/40 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30 shadow-lg">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center shadow-cyan-500/20 shadow-lg border border-cyan-400/40">
             <Swords className="w-6 h-6 text-white" />
@@ -899,7 +883,7 @@ export default function VanguardGame({ currentUser }) {
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              ระบบจำลองการเล่นและการจัดเด็คการ์ดแวนการ์ดสมจริง (Official Rules)
+              ลากการ์ดจากมือลงช่องเพื่อไรด์ (VC) หรือคอล (RC ทั้งแถวหน้าและแถวหลัง)
             </p>
           </div>
         </div>
@@ -915,7 +899,7 @@ export default function VanguardGame({ currentUser }) {
             }`}
           >
             <Swords className="w-4 h-4" />
-            <span>สนามประลอง (Battle Arena)</span>
+            <span>สนามประลอง (Playmat)</span>
           </button>
           <button
             onClick={() => setActiveTab('deckbuilder')}
@@ -941,12 +925,11 @@ export default function VanguardGame({ currentUser }) {
           </button>
         </div>
 
-        {/* Audio Mute & Quick Actions */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition border border-slate-700 cursor-pointer"
-            title={soundEnabled ? 'ปิดเสียงเอฟเฟกต์' : 'เปิดเสียงเอฟเฟกต์'}
+            title={soundEnabled ? 'ปิดเสียง' : 'เปิดเสียง'}
           >
             {soundEnabled ? (
               <Volume2 className="w-4 h-4 text-cyan-400" />
@@ -958,16 +941,16 @@ export default function VanguardGame({ currentUser }) {
       </header>
 
       {/* ======================================================== */}
-      {/* TAB 1: BATTLE ARENA (PLAYMAT FOLLOWING REFERENCE IMAGE)   */}
+      {/* TAB 1: BATTLE ARENA (PLAYMAT ACCORDING TO REFERENCE)      */}
       {/* ======================================================== */}
       {activeTab === 'arena' && (
-        <div className="flex-1 flex flex-col p-2 sm:p-4 gap-3 max-w-[1550px] mx-auto w-full">
-          {/* Status & Phase Controller Bar */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+        <div className="flex-1 flex flex-col p-2 sm:p-3 gap-2 max-w-[1580px] mx-auto w-full">
+          {/* Phase Control Bar */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shadow-xl">
             <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-slate-400">สถานะแมตช์:</span>
+              <span className="text-xs font-semibold text-slate-400">สถานะ:</span>
               <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
                   matchStatus === 'playing'
                     ? turnPlayer === 'player'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse'
@@ -982,9 +965,8 @@ export default function VanguardGame({ currentUser }) {
                   : 'ยังไม่ได้เริ่มเกม'}
               </span>
 
-              {/* Phase Indicators */}
               <div className="hidden md:flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                {['STAND', 'DRAW', 'RIDE', 'MAIN', 'BATTLE', 'END'].map((p) => (
+                {['STAND', 'DRAW', 'MAIN', 'BATTLE', 'END'].map((p) => (
                   <span
                     key={p}
                     className={`px-2 py-0.5 rounded-md font-bold transition ${
@@ -1020,35 +1002,31 @@ export default function VanguardGame({ currentUser }) {
                   </button>
                 </>
               ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleStartGame('royal_paladin', 'kagero')}
-                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white font-black text-sm hover:scale-105 transition shadow-lg shadow-cyan-500/25 cursor-pointer flex items-center gap-2"
-                  >
-                    <Play className="w-4 h-4 fill-white" />
-                    <span>เริ่มแบทเทิล (Royal Paladin VS Kagero)</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleStartGame('royal_paladin', 'kagero')}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white font-black text-sm hover:scale-105 transition shadow-lg shadow-cyan-500/25 cursor-pointer flex items-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>เริ่มแบทเทิล (Royal Paladin VS Kagero)</span>
+                </button>
               )}
             </div>
           </div>
 
-          {/* MAIN ARENA GRID: 2 COLUMNS (LEFT = PLAYMAT ACCORDING TO USER'S IMAGE, RIGHT = LOGS & DECK STATS) */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1">
-            {/* ======================================================== */}
-            {/* THE PLAYMAT (ตามรูปถ่าย V-SERIES ของผู้ใช้ 100%)           */}
-            {/* ======================================================== */}
-            <div className="lg:col-span-3 bg-black/90 border border-slate-800/80 rounded-3xl p-3 sm:p-5 flex flex-col justify-between shadow-2xl relative overflow-hidden min-h-[720px]">
+          {/* PLAYMAT MAIN GRID */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1">
+            {/* THE ARENA BOARD (9 COLUMNS) */}
+            <div className="lg:col-span-9 bg-black/95 border border-slate-800/80 rounded-3xl p-3 sm:p-4 flex flex-col justify-between shadow-2xl relative overflow-hidden min-h-[740px]">
               {/* Sci-Fi Grid Background Lines */}
-              <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none"></div>
+              <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-35 pointer-events-none"></div>
 
               {/* ---------------------------------------------------- */}
-              {/* OPPONENT MINI FIELD (สนามศัตรูด้านบน)                  */}
+              {/* 1. OPPONENT FIELD (สนามศัตรู)                         */}
               {/* ---------------------------------------------------- */}
-              <div className="relative z-10 border-b border-slate-800/60 pb-3 mb-2">
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <div className="relative z-10 border-b border-slate-800/60 pb-2">
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 px-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-red-400">🤖 ศัตรู (Kagero / Toshiki Kai)</span>
+                    <span className="font-bold text-red-400">🤖 ศัตรู (Kagero)</span>
                     <span className="px-2 py-0.5 rounded bg-red-950/60 text-red-300 border border-red-800/40 text-[10px]">
                       Damage: {oppDamage.length}/6
                     </span>
@@ -1063,80 +1041,50 @@ export default function VanguardGame({ currentUser }) {
                   )}
                 </div>
 
-                {/* Opponent Circles Row */}
                 <div className="flex items-center justify-center gap-3 sm:gap-6">
-                  {/* Opponent Left Front RG */}
+                  {/* Opponent FL RG */}
                   <div
                     onClick={() => selectedAttackerCircle && handleSelectTarget('opp-fl')}
-                    className={`w-20 h-28 sm:w-24 sm:h-32 rounded-xl border-2 flex flex-col items-center justify-center relative transition ${
+                    className={`w-20 h-28 sm:w-24 sm:h-34 rounded-xl border-2 flex items-center justify-center relative transition ${
                       selectedAttackerCircle
                         ? 'border-yellow-400 shadow-lg shadow-yellow-500/30 cursor-pointer animate-pulse'
                         : 'border-slate-800 bg-slate-900/60'
                     }`}
                   >
                     {oppRearguards.fl ? (
-                      <div className="w-full h-full p-1 flex flex-col justify-between text-[10px]">
-                        <span className="font-bold truncate text-slate-200">
-                          {oppRearguards.fl.nameTh}
-                        </span>
-                        <div className="text-center font-black text-yellow-400">
-                          {getOppCirclePower('fl')}
-                        </div>
-                        <span className="text-[9px] text-slate-400">G{oppRearguards.fl.grade} RG</span>
-                      </div>
+                      <RenderCardItem card={oppRearguards.fl} isRest={oppRearguards.fl.isRest} />
                     ) : (
                       <span className="text-[10px] text-slate-600">RG (Front)</span>
                     )}
                   </div>
 
-                  {/* Opponent Vanguard (Red Circle) */}
+                  {/* Opponent Vanguard (VC) */}
                   <div
                     onClick={() => selectedAttackerCircle && handleSelectTarget('opp-vc')}
-                    className={`w-24 h-32 sm:w-28 sm:h-36 rounded-xl border-2 flex flex-col items-center justify-center relative transition ${
+                    className={`w-24 h-34 sm:w-28 sm:h-40 rounded-xl border-2 flex items-center justify-center relative transition ${
                       selectedAttackerCircle
                         ? 'border-red-500 shadow-xl shadow-red-500/50 cursor-pointer animate-bounce'
                         : 'border-red-700/60 bg-red-950/30'
                     }`}
                   >
                     {oppVanguard ? (
-                      <div className="w-full h-full p-1.5 flex flex-col justify-between text-xs">
-                        <div className="flex justify-between items-center text-[10px]">
-                          <span className="px-1.5 py-0.5 rounded bg-red-900 text-red-200 font-bold">
-                            G{oppVanguard.grade}
-                          </span>
-                          <span className="text-slate-400">VG</span>
-                        </div>
-                        <div className="text-center font-black text-red-400 text-sm">
-                          {getOppCirclePower('vc')}
-                        </div>
-                        <span className="font-bold text-[10px] truncate text-slate-200">
-                          {oppVanguard.nameTh}
-                        </span>
-                      </div>
+                      <RenderCardItem card={oppVanguard} isRest={oppVanguard.isRest} />
                     ) : (
                       <span className="text-xs text-red-500 font-bold">VANGUARD</span>
                     )}
                   </div>
 
-                  {/* Opponent Right Front RG */}
+                  {/* Opponent FR RG */}
                   <div
                     onClick={() => selectedAttackerCircle && handleSelectTarget('opp-fr')}
-                    className={`w-20 h-28 sm:w-24 sm:h-32 rounded-xl border-2 flex flex-col items-center justify-center relative transition ${
+                    className={`w-20 h-28 sm:w-24 sm:h-34 rounded-xl border-2 flex items-center justify-center relative transition ${
                       selectedAttackerCircle
                         ? 'border-yellow-400 shadow-lg shadow-yellow-500/30 cursor-pointer animate-pulse'
                         : 'border-slate-800 bg-slate-900/60'
                     }`}
                   >
                     {oppRearguards.fr ? (
-                      <div className="w-full h-full p-1 flex flex-col justify-between text-[10px]">
-                        <span className="font-bold truncate text-slate-200">
-                          {oppRearguards.fr.nameTh}
-                        </span>
-                        <div className="text-center font-black text-yellow-400">
-                          {getOppCirclePower('fr')}
-                        </div>
-                        <span className="text-[9px] text-slate-400">G{oppRearguards.fr.grade} RG</span>
-                      </div>
+                      <RenderCardItem card={oppRearguards.fr} isRest={oppRearguards.fr.isRest} />
                     ) : (
                       <span className="text-[10px] text-slate-600">RG (Front)</span>
                     )}
@@ -1145,31 +1093,35 @@ export default function VanguardGame({ currentUser }) {
               </div>
 
               {/* ---------------------------------------------------- */}
-              {/* PLAYER V-SERIES PLAYMAT (ตรงตามรูปที่ผู้ใช้ส่งมาเป๊ะ!)   */}
+              {/* 2. PLAYER PLAYMAT (ตามรูปถ่าย V-SERIES เป๊ะ 100%)       */}
               {/* ---------------------------------------------------- */}
-              <div className="relative z-10 flex-1 grid grid-cols-12 gap-2 sm:gap-3 py-2 items-center">
-                {/* 1. LEFT COLUMN: GIFT ZONE (TOP) + DAMAGE ZONE (VERTICAL 6 SLOTS) */}
+              <div className="relative z-10 grid grid-cols-12 gap-2 sm:gap-3 py-2 items-center">
+                {/* 2.1 LEFT COLUMN: GIFT (TOP) + DAMAGE ZONE (VERTICAL) */}
                 <div className="col-span-2 flex flex-col items-center gap-2">
-                  {/* 🎁 GIFT ZONE (ตามรูปซ้ายบน) */}
+                  {/* 🎁 GIFT ZONE (ซ้ายบน ตามรูป) */}
                   <div
-                    className="w-16 h-22 sm:w-20 sm:h-26 rounded-xl border border-cyan-500/50 bg-gradient-to-b from-cyan-950/80 to-blue-950/80 flex flex-col items-center justify-center p-1 relative shadow-cyan-500/20 shadow-md"
-                    title="Imaginary Gift Zone"
+                    className="w-16 h-22 sm:w-20 sm:h-28 rounded-xl border border-cyan-500/50 bg-slate-950 flex flex-col items-center justify-between p-1 relative shadow-cyan-500/20 shadow-md overflow-hidden"
+                    title="Imaginary Gift: Force"
                   >
-                    <span className="text-[10px] font-black text-cyan-400 tracking-wider">
+                    <img
+                      src="/vanguard/gift-back.png"
+                      alt="Gift Back"
+                      className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none"
+                    />
+                    <span className="relative z-10 text-[9px] font-black text-cyan-300 uppercase">
                       Gift
                     </span>
-                    <Sparkles className="w-4 h-4 text-cyan-300 my-1 animate-spin" />
-                    <span className="text-xs font-black text-white">
+                    <span className="relative z-10 text-xs font-black text-white px-2 py-0.5 rounded-full bg-cyan-900/80 border border-cyan-400">
                       x{playerGiftCount}
                     </span>
-                    <span className="text-[9px] text-cyan-300 font-semibold text-center">
+                    <span className="relative z-10 text-[8px] text-cyan-300 font-bold">
                       Force I
                     </span>
                   </div>
 
-                  {/* 🩸 DAMAGE ZONE (ตามรูปซ้ายแถวแนวตั้ง 6 สเต็ป) */}
+                  {/* 🩸 DAMAGE ZONE (ซ้ายแนวตั้ง 6 สเต็ป ตามรูป) */}
                   <div className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-1.5 flex flex-col gap-1 items-center">
-                    <span className="text-[10px] font-black uppercase text-red-400 tracking-wider">
+                    <span className="text-[9px] font-black uppercase text-red-400 tracking-wider">
                       Damage Zone
                     </span>
                     <div className="w-full flex flex-col gap-1">
@@ -1179,11 +1131,11 @@ export default function VanguardGame({ currentUser }) {
                           <div
                             key={slotIdx}
                             onClick={() => card && toggleDamageFaceDown(slotIdx)}
-                            className={`h-7 rounded-lg border text-[10px] flex items-center justify-between px-2 cursor-pointer transition ${
+                            className={`h-7 rounded-lg border text-[10px] flex items-center justify-between px-1.5 cursor-pointer transition overflow-hidden relative ${
                               card
                                 ? card.isFaceDown
-                                ? 'bg-slate-900 border-slate-700 text-slate-500 line-through'
-                                : 'bg-red-950/70 border-red-600/60 text-red-200 font-bold shadow-sm'
+                                  ? 'bg-slate-900 border-slate-700 text-slate-500'
+                                  : 'bg-red-950/80 border-red-500/70 text-red-200 font-bold shadow-sm'
                                 : 'bg-slate-900/40 border-slate-800/60 text-slate-700 justify-center'
                             }`}
                             title={
@@ -1194,10 +1146,17 @@ export default function VanguardGame({ currentUser }) {
                           >
                             {card ? (
                               <>
-                                <span className="truncate max-w-[80px]">
+                                <img
+                                  src={card.artUrl}
+                                  alt=""
+                                  className={`w-5 h-6 object-cover rounded shrink-0 mr-1 ${
+                                    card.isFaceDown ? 'grayscale opacity-40' : ''
+                                  }`}
+                                />
+                                <span className={`truncate text-[9px] flex-1 ${card.isFaceDown ? 'line-through text-slate-500' : ''}`}>
                                   {card.nameTh}
                                 </span>
-                                <span className="text-[9px]">
+                                <span className="text-[8px] px-1 rounded bg-black/60 shrink-0 ml-1">
                                   {card.isFaceDown ? 'CB' : 'Act'}
                                 </span>
                               </>
@@ -1211,218 +1170,171 @@ export default function VanguardGame({ currentUser }) {
                   </div>
                 </div>
 
-                {/* 2. CENTER AREA: GUARD CIRCLE (TOP) + 6 CIRCLES (VG & 5 RG) */}
-                <div className="col-span-8 flex flex-col items-center gap-3">
-                  {/* 🛡️ GUARDIAN CIRCLE (วงเวทย์สีฟ้าตรงกลางด้านบน ตามรูป) */}
-                  <div className="relative flex flex-col items-center">
-                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 border-cyan-400/80 bg-cyan-950/30 flex flex-col items-center justify-center shadow-cyan-400/30 shadow-xl relative backdrop-blur-sm">
-                      {/* วงแหวนเวทย์มนตร์ GUARD */}
-                      <div className="absolute inset-1 rounded-full border border-dashed border-cyan-300/40 animate-[spin_18s_linear_infinite]"></div>
-                      <div className="absolute inset-3 rounded-full border border-cyan-500/30"></div>
-                      <Shield className="w-6 h-6 text-cyan-300 mb-0.5" />
-                      <span className="text-[11px] font-black text-cyan-200 tracking-wider">
-                        GUARD
-                      </span>
-                    </div>
+                {/* 2.2 CENTER COLUMN: GUARD (TOP) + 6 FIELD CIRCLES */}
+                <div className="col-span-8 flex flex-col items-center gap-2">
+                  {/* 🛡️ GUARDIAN CIRCLE (วงเวทย์สีฟ้าตรงกลางบน ตามรูป) */}
+                  <div
+                    onDragOver={(e) => handleDragOver(e, 'gc')}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDropOnCircle(e, 'gc')}
+                    className={`w-22 h-22 sm:w-26 sm:h-26 rounded-full border-2 flex flex-col items-center justify-center relative transition-all backdrop-blur-sm ${
+                      dragOverCircle === 'gc'
+                        ? 'border-cyan-300 bg-cyan-900/50 scale-110 shadow-cyan-400 shadow-2xl animate-pulse'
+                        : 'border-cyan-400/80 bg-cyan-950/30 shadow-cyan-400/30 shadow-xl'
+                    }`}
+                  >
+                    <div className="absolute inset-1 rounded-full border border-dashed border-cyan-300/40 animate-[spin_18s_linear_infinite] pointer-events-none"></div>
+                    <Shield className="w-5 h-5 text-cyan-300 mb-0.5" />
+                    <span className="text-[10px] font-black text-cyan-200 tracking-wider">
+                      GUARD
+                    </span>
+                    <span className="text-[8px] text-cyan-300/80">
+                      {dragOverCircle === 'gc' ? 'ปล่อยเพื่อวางกัน' : 'ลากมาป้องกัน'}
+                    </span>
                   </div>
 
-                  {/* FIELD GRID: 2 ROWS (FRONT ROW = REAR / VANGUARD / REAR) & (BACK ROW = 3 REARS) */}
-                  <div className="w-full flex flex-col gap-3">
-                    {/* FRONT ROW: [REAR LEFT] - [VANGUARD RED] - [REAR RIGHT] */}
+                  {/* 6 CIRCLES GRID */}
+                  <div className="w-full flex flex-col gap-2.5">
+                    {/* FRONT ROW: [FL] - [VC] - [FR] */}
                     <div className="flex items-center justify-center gap-3 sm:gap-6">
-                      {/* 🟢 Front-Left Rear-Guard Circle */}
+                      {/* 🟢 FRONT-LEFT REARGUARD (FL) */}
                       <div
+                        onDragOver={(e) => handleDragOver(e, 'fl')}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDropOnCircle(e, 'fl')}
                         onClick={() => handleDeclareAttack('fl')}
-                        className={`w-24 h-32 sm:w-28 sm:h-38 rounded-2xl border-2 flex flex-col items-center justify-center relative transition ${
-                          playerRearguards.fl
-                            ? playerRearguards.fl.isRest
-                              ? 'rotate-12 opacity-80 border-slate-700 bg-slate-900/60'
-                              : 'border-emerald-500 bg-emerald-950/40 shadow-emerald-500/20 shadow-lg cursor-pointer hover:scale-105'
-                            : 'border-emerald-800/50 bg-emerald-950/10'
+                        className={`w-22 h-30 sm:w-26 sm:h-36 rounded-2xl border-2 flex items-center justify-center relative transition-all ${
+                          dragOverCircle === 'fl'
+                            ? 'border-yellow-300 bg-emerald-900/60 scale-105 shadow-yellow-400 shadow-xl'
+                            : playerRearguards.fl
+                            ? 'border-emerald-500 bg-emerald-950/40 shadow-emerald-500/20 shadow-lg cursor-pointer'
+                            : 'border-emerald-800/60 bg-emerald-950/20'
                         }`}
                       >
                         {playerRearguards.fl ? (
-                          <div className="w-full h-full p-2 flex flex-col justify-between text-xs">
-                            <div className="flex justify-between items-center text-[10px]">
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-900 text-emerald-200 font-bold">
-                                G{playerRearguards.fl.grade}
-                              </span>
-                              <span className="text-emerald-400">FL</span>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-black text-emerald-300">
-                                {getCirclePower('fl')}
-                              </div>
-                              <div className="text-[10px] text-slate-300 font-medium truncate">
-                                {playerRearguards.fl.nameTh}
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center text-[9px] text-slate-400">
-                              <span>RG Front</span>
-                              <span>Atk</span>
-                            </div>
-                          </div>
+                          <RenderCardItem
+                            card={playerRearguards.fl}
+                            isRest={playerRearguards.fl.isRest}
+                          />
                         ) : (
-                          <div className="flex flex-col items-center">
-                            <div className="w-12 h-12 rounded-full border border-emerald-500/40 flex items-center justify-center mb-1">
+                          <div className="flex flex-col items-center pointer-events-none">
+                            <div className="w-10 h-10 rounded-full border border-emerald-500/40 flex items-center justify-center mb-1">
                               <span className="text-emerald-400 font-black text-sm">R</span>
                             </div>
-                            <span className="text-[10px] font-bold text-emerald-400">REAR</span>
+                            <span className="text-[9px] font-bold text-emerald-400">REAR (FL)</span>
+                            <span className="text-[8px] text-slate-500">ลากการ์ดมาคอล</span>
                           </div>
                         )}
                       </div>
 
-                      {/* ⚔️ VANGUARD CIRCLE (วงเวทย์สีแดง วางตัวเอก ตรงกลาง ตามรูป) */}
+                      {/* ⚔️ VANGUARD CIRCLE (VC วงเวทย์สีแดง วางตัวเอก ตรงกลาง ตามรูป) */}
                       <div
+                        onDragOver={(e) => handleDragOver(e, 'vc')}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDropOnCircle(e, 'vc')}
                         onClick={() => handleDeclareAttack('vc')}
-                        className={`w-28 h-36 sm:w-32 sm:h-44 rounded-2xl border-2 flex flex-col items-center justify-between p-2 relative transition ${
-                          playerVanguard
-                            ? playerVanguard.isRest
-                              ? 'rotate-12 border-slate-700 bg-slate-900/60 opacity-80'
-                              : 'border-red-500 bg-gradient-to-b from-red-950/60 to-slate-950 shadow-red-500/40 shadow-2xl cursor-pointer hover:scale-105'
+                        className={`w-26 h-36 sm:w-30 sm:h-42 rounded-2xl border-2 flex items-center justify-center relative transition-all ${
+                          dragOverCircle === 'vc'
+                            ? 'border-yellow-300 bg-red-900/70 scale-105 shadow-yellow-400 shadow-2xl'
+                            : playerVanguard
+                            ? 'border-red-500 bg-gradient-to-b from-red-950/60 to-slate-950 shadow-red-500/40 shadow-2xl cursor-pointer'
                             : 'border-red-700/60 bg-red-950/20'
                         }`}
                       >
                         {playerVanguard ? (
-                          <>
-                            {/* Card Header */}
-                            <div className="w-full flex justify-between items-center text-xs">
-                              <span className="px-2 py-0.5 rounded-md bg-red-900/80 text-red-200 font-black border border-red-600/40">
-                                G{playerVanguard.grade}
-                              </span>
-                              <span className="text-[10px] font-black uppercase text-red-400">
-                                Vanguard
-                              </span>
-                            </div>
-
-                            {/* Power Display */}
-                            <div className="text-center my-auto">
-                              <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-yellow-300">
-                                {getCirclePower('vc')}
-                              </div>
-                              <div className="text-xs font-bold text-slate-200 truncate max-w-[110px]">
-                                {playerVanguard.nameTh}
-                              </div>
-                              <div className="text-[10px] text-red-300 mt-0.5">
-                                {playerVanguard.skillType}
-                              </div>
-                            </div>
-
-                            {/* Card Footer: Soul Count & Status */}
-                            <div className="w-full flex justify-between items-center text-[10px] pt-1 border-t border-red-800/40">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  alert(
-                                    `Soul ปัจจุบัน (${playerSoul.length} ใบ):\n` +
-                                      playerSoul.map((s, i) => `${i + 1}. ${s.nameTh}`).join('\n')
-                                  )
-                                }}
-                                className="px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-200 font-bold hover:bg-purple-800"
-                              >
-                                Soul: {playerSoul.length}
-                              </button>
-                              <span className="text-yellow-400 font-bold">
-                                Crit {playerVanguard.critical || 1}
-                              </span>
-                            </div>
-                          </>
+                          <div className="w-full h-full relative">
+                            <RenderCardItem
+                              card={playerVanguard}
+                              isRest={playerVanguard.isRest}
+                            />
+                            {/* Soul Indicator Badge */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                alert(
+                                  `Soul ปัจจุบัน (${playerSoul.length} ใบ):\n` +
+                                    playerSoul.map((s, i) => `${i + 1}. ${s.nameTh}`).join('\n')
+                                )
+                              }}
+                              className="absolute top-1 right-1 z-20 px-1.5 py-0.2 rounded bg-purple-900/90 border border-purple-400 text-purple-200 text-[9px] font-black hover:bg-purple-800"
+                              title="คลิกเพื่อดูการ์ดใน Soul"
+                            >
+                              Soul: {playerSoul.length}
+                            </button>
+                          </div>
                         ) : (
-                          <div className="flex flex-col items-center my-auto">
-                            <div className="w-14 h-14 rounded-full border border-red-500/60 flex items-center justify-center mb-1">
-                              <span className="text-red-400 font-black text-lg">V</span>
+                          <div className="flex flex-col items-center pointer-events-none">
+                            <div className="w-12 h-12 rounded-full border border-red-500/60 flex items-center justify-center mb-1">
+                              <span className="text-red-400 font-black text-base">V</span>
                             </div>
-                            <span className="text-xs font-black text-red-400">VANGUARD</span>
+                            <span className="text-[10px] font-black text-red-400">VANGUARD</span>
+                            <span className="text-[8px] text-red-300">ลากการ์ดมา RIDE</span>
                           </div>
                         )}
                       </div>
 
-                      {/* 🟢 Front-Right Rear-Guard Circle */}
+                      {/* 🟢 FRONT-RIGHT REARGUARD (FR) */}
                       <div
+                        onDragOver={(e) => handleDragOver(e, 'fr')}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDropOnCircle(e, 'fr')}
                         onClick={() => handleDeclareAttack('fr')}
-                        className={`w-24 h-32 sm:w-28 sm:h-38 rounded-2xl border-2 flex flex-col items-center justify-center relative transition ${
-                          playerRearguards.fr
-                            ? playerRearguards.fr.isRest
-                              ? 'rotate-12 opacity-80 border-slate-700 bg-slate-900/60'
-                              : 'border-emerald-500 bg-emerald-950/40 shadow-emerald-500/20 shadow-lg cursor-pointer hover:scale-105'
-                            : 'border-emerald-800/50 bg-emerald-950/10'
+                        className={`w-22 h-30 sm:w-26 sm:h-36 rounded-2xl border-2 flex items-center justify-center relative transition-all ${
+                          dragOverCircle === 'fr'
+                            ? 'border-yellow-300 bg-emerald-900/60 scale-105 shadow-yellow-400 shadow-xl'
+                            : playerRearguards.fr
+                            ? 'border-emerald-500 bg-emerald-950/40 shadow-emerald-500/20 shadow-lg cursor-pointer'
+                            : 'border-emerald-800/60 bg-emerald-950/20'
                         }`}
                       >
                         {playerRearguards.fr ? (
-                          <div className="w-full h-full p-2 flex flex-col justify-between text-xs">
-                            <div className="flex justify-between items-center text-[10px]">
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-900 text-emerald-200 font-bold">
-                                G{playerRearguards.fr.grade}
-                              </span>
-                              <span className="text-emerald-400">FR</span>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-black text-emerald-300">
-                                {getCirclePower('fr')}
-                              </div>
-                              <div className="text-[10px] text-slate-300 font-medium truncate">
-                                {playerRearguards.fr.nameTh}
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center text-[9px] text-slate-400">
-                              <span>RG Front</span>
-                              <span>Atk</span>
-                            </div>
-                          </div>
+                          <RenderCardItem
+                            card={playerRearguards.fr}
+                            isRest={playerRearguards.fr.isRest}
+                          />
                         ) : (
-                          <div className="flex flex-col items-center">
-                            <div className="w-12 h-12 rounded-full border border-emerald-500/40 flex items-center justify-center mb-1">
+                          <div className="flex flex-col items-center pointer-events-none">
+                            <div className="w-10 h-10 rounded-full border border-emerald-500/40 flex items-center justify-center mb-1">
                               <span className="text-emerald-400 font-black text-sm">R</span>
                             </div>
-                            <span className="text-[10px] font-bold text-emerald-400">REAR</span>
+                            <span className="text-[9px] font-bold text-emerald-400">REAR (FR)</span>
+                            <span className="text-[8px] text-slate-500">ลากการ์ดมาคอล</span>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* BACK ROW: [REAR BACK-LEFT] - [REAR BACK-CENTER] - [REAR BACK-RIGHT] */}
+                    {/* BACK ROW: [BL] - [BC] - [BR] (แถวหลัง คอลได้อิสระ!) */}
                     <div className="flex items-center justify-center gap-3 sm:gap-6">
                       {['bl', 'bc', 'br'].map((key) => {
                         const unit = playerRearguards[key]
+                        const label = { bl: 'REAR (BL)', bc: 'REAR (BC)', br: 'REAR (BR)' }[key]
+
                         return (
                           <div
                             key={key}
-                            className={`w-20 h-28 sm:w-24 sm:h-32 rounded-2xl border-2 flex flex-col items-center justify-center relative transition ${
-                              unit
-                                ? unit.isRest
-                                  ? 'rotate-12 opacity-80 border-slate-700 bg-slate-900/60'
-                                  : 'border-emerald-500/80 bg-emerald-950/30 shadow-md'
-                                : 'border-emerald-800/40 bg-emerald-950/10'
+                            onDragOver={(e) => handleDragOver(e, key)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDropOnCircle(e, key)}
+                            className={`w-20 h-28 sm:w-24 sm:h-32 rounded-2xl border-2 flex items-center justify-center relative transition-all ${
+                              dragOverCircle === key
+                                ? 'border-yellow-300 bg-emerald-900/60 scale-105 shadow-yellow-400 shadow-lg'
+                                : unit
+                                ? 'border-emerald-500/80 bg-emerald-950/40 shadow-md'
+                                : 'border-emerald-800/50 bg-emerald-950/15'
                             }`}
                           >
                             {unit ? (
-                              <div className="w-full h-full p-2 flex flex-col justify-between text-[10px]">
-                                <div className="flex justify-between items-center">
-                                  <span className="px-1 py-0.5 rounded bg-emerald-900 text-emerald-200 font-bold">
-                                    G{unit.grade}
-                                  </span>
-                                  <span className="text-emerald-400 uppercase">{key}</span>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-base font-black text-emerald-300">
-                                    {unit.power}
-                                  </div>
-                                  <div className="truncate text-slate-300 font-medium">
-                                    {unit.nameTh}
-                                  </div>
-                                </div>
-                                <span className="text-[9px] text-slate-400 text-center">
-                                  Boost {unit.skillType}
-                                </span>
-                              </div>
+                              <RenderCardItem card={unit} isRest={unit.isRest} />
                             ) : (
-                              <div className="flex flex-col items-center">
-                                <div className="w-10 h-10 rounded-full border border-emerald-500/30 flex items-center justify-center mb-1">
+                              <div className="flex flex-col items-center pointer-events-none">
+                                <div className="w-8 h-8 rounded-full border border-emerald-500/30 flex items-center justify-center mb-1">
                                   <span className="text-emerald-400 font-bold text-xs">R</span>
                                 </div>
                                 <span className="text-[9px] font-bold text-emerald-400 uppercase">
-                                  REAR ({key})
+                                  {label}
                                 </span>
+                                <span className="text-[8px] text-slate-500">ลากมาคอลแถวหลัง</span>
                               </div>
                             )}
                           </div>
@@ -1432,27 +1344,28 @@ export default function VanguardGame({ currentUser }) {
                   </div>
                 </div>
 
-                {/* 3. RIGHT COLUMN: TRIGGER ZONE (TOP), DECK (MID), DROP ZONE (BOTTOM) */}
+                {/* 2.3 RIGHT COLUMN: TRIGGER (TOP), DECK (MID), DROP (BOTTOM) */}
                 <div className="col-span-2 flex flex-col items-center justify-between h-full py-1 gap-2">
                   {/* ✨ TRIGGER ZONE (ขวาบน ตามรูป) */}
-                  <div className="w-20 h-28 sm:w-24 sm:h-32 rounded-xl border border-slate-700 bg-slate-900/80 flex flex-col items-center justify-center p-1.5 relative shadow-lg">
-                    <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider mb-1">
+                  <div className="w-18 h-26 sm:w-22 sm:h-30 rounded-xl border border-slate-700 bg-slate-900/80 flex flex-col items-center justify-center p-1 relative shadow-lg overflow-hidden">
+                    <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider mb-0.5">
                       Trigger
                     </span>
                     {playerTriggerZone ? (
-                      <div className="w-full h-full flex flex-col items-center justify-between text-center animate-pulse">
-                        <span className="text-[10px] font-black text-amber-300">
-                          {playerTriggerZone.triggerType || 'NORMAL'}
-                        </span>
-                        <div className="text-xs font-black text-white truncate max-w-[80px]">
-                          {playerTriggerZone.nameTh}
+                      <div className="w-full h-full relative rounded-lg overflow-hidden animate-pulse">
+                        <img
+                          src={playerTriggerZone.artUrl}
+                          alt=""
+                          className="w-full h-full object-cover object-top"
+                        />
+                        <div className="absolute bottom-0 inset-x-0 bg-black/80 text-center py-0.5">
+                          <span className="text-[9px] font-black text-amber-300">
+                            {playerTriggerZone.triggerType || 'NORMAL'}
+                          </span>
                         </div>
-                        <span className="text-[9px] text-slate-400">
-                          Power {playerTriggerZone.power}
-                        </span>
                       </div>
                     ) : (
-                      <span className="text-[10px] text-slate-600 font-bold">READY</span>
+                      <span className="text-[9px] text-slate-600 font-bold">READY</span>
                     )}
                   </div>
 
@@ -1461,13 +1374,22 @@ export default function VanguardGame({ currentUser }) {
                     onClick={() => {
                       if (currentPhase === 'DRAW') handleNextPhase()
                     }}
-                    className="w-20 h-28 sm:w-24 sm:h-32 rounded-xl border-2 border-indigo-500/40 bg-gradient-to-br from-indigo-950 via-slate-950 to-blue-950 flex flex-col items-center justify-between p-2 relative shadow-lg cursor-pointer hover:border-indigo-400 transition"
+                    className="w-18 h-26 sm:w-22 sm:h-30 rounded-xl border-2 border-indigo-500/40 bg-slate-950 flex flex-col items-center justify-between p-1.5 relative shadow-lg cursor-pointer hover:border-indigo-400 transition overflow-hidden"
                   >
-                    <span className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">
+                    <img
+                      src="/vanguard/card-back.png"
+                      alt="Deck Back"
+                      className="absolute inset-0 w-full h-full object-cover opacity-70 pointer-events-none"
+                    />
+                    <span className="relative z-10 text-[9px] font-black uppercase text-indigo-200">
                       Deck
                     </span>
-                    <div className="text-2xl font-black text-white">{playerDeck.length}</div>
-                    <span className="text-[9px] text-indigo-400 font-semibold">ใบ</span>
+                    <div className="relative z-10 text-xl font-black text-white px-2 py-0.5 rounded bg-black/70 border border-indigo-400">
+                      {playerDeck.length}
+                    </div>
+                    <span className="relative z-10 text-[8px] text-indigo-300 font-bold">
+                      {currentPhase === 'DRAW' ? 'คลิกเพื่อจั่ว' : 'การ์ดในกอง'}
+                    </span>
                   </div>
 
                   {/* 🪦 DROP ZONE (ขวาล่าง ตามรูป) */}
@@ -1480,89 +1402,83 @@ export default function VanguardGame({ currentUser }) {
                         )
                       }
                     }}
-                    className="w-20 h-26 sm:w-24 sm:h-30 rounded-xl border border-slate-800 bg-slate-950 flex flex-col items-center justify-center p-1.5 relative cursor-pointer hover:bg-slate-900 transition"
+                    className="w-18 h-24 sm:w-22 sm:h-28 rounded-xl border border-slate-800 bg-slate-950 flex flex-col items-center justify-center p-1 relative cursor-pointer hover:bg-slate-900 transition overflow-hidden"
                   >
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">
-                      Drop Zone
-                    </span>
-                    <span className="text-lg font-black text-slate-400">
-                      {playerDrop.length}
-                    </span>
-                    <span className="text-[9px] text-slate-600">คลิกเพื่อดู</span>
+                    {playerDrop.length > 0 ? (
+                      <div className="w-full h-full relative">
+                        <img
+                          src={playerDrop[0].artUrl}
+                          alt=""
+                          className="w-full h-full object-cover opacity-60 rounded-lg"
+                        />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
+                          <span className="text-[8px] text-slate-400 uppercase">Drop</span>
+                          <span className="text-sm font-black text-white">{playerDrop.length}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-[9px] font-black uppercase text-slate-500 mb-1">
+                          Drop
+                        </span>
+                        <span className="text-base font-black text-slate-400">0</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* ---------------------------------------------------- */}
-              {/* PLAYER HAND CARDS (มือผู้เล่นด้านล่าง)                  */}
+              {/* 3. PLAYER HAND CARDS (มือผู้เล่น ลากไปวางได้เลย!)       */}
               {/* ---------------------------------------------------- */}
-              <div className="relative z-10 pt-3 border-t border-slate-800/80">
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <div className="relative z-10 pt-2 border-t border-slate-800/80">
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 px-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-cyan-400">
-                      🎴 การ์ดบนมือของคุณ ({playerHand.length} ใบ)
+                    <span className="font-bold text-cyan-400 flex items-center gap-1.5">
+                      <Move className="w-3.5 h-3.5" />
+                      <span>การ์ดบนมือ ({playerHand.length} ใบ)</span>
                     </span>
-                    <span className="text-[10px] text-slate-500">
-                      คลิกการ์ดเพื่อไรด์ (Ride) หรือคอล (Call) ลงเรียร์การ์ด
+                    <span className="text-[10px] text-amber-300 font-semibold">
+                      👉 ลากการ์ดขึ้นไปวางบนช่องที่ต้องการ (VC = ไรด์, RC ทุกช่อง หน้า-หลัง = คอล)
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-700">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-700 min-h-[140px]">
                   {playerHand.map((card, idx) => (
                     <div
                       key={card.instanceId}
-                      className="w-24 h-36 shrink-0 rounded-xl bg-slate-900 border border-slate-700 p-2 flex flex-col justify-between hover:border-cyan-400 hover:-translate-y-2 transition-all cursor-pointer shadow-md group relative"
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, card, idx)}
+                      onMouseEnter={() => setHoveredCard(card)}
+                      onMouseLeave={() => setHoveredCard(null)}
+                      className="w-22 h-32 sm:w-24 sm:h-36 shrink-0 rounded-xl overflow-hidden border-2 border-slate-700 hover:border-cyan-400 hover:-translate-y-2 hover:shadow-cyan-500/30 hover:shadow-xl transition-all cursor-grab active:cursor-grabbing relative group"
                     >
-                      {/* Card Header */}
-                      <div className="flex justify-between items-center text-[10px]">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-bold">
-                          G{card.grade}
+                      <img
+                        src={card.artUrl}
+                        alt={card.nameTh}
+                        className="w-full h-full object-cover object-top pointer-events-none"
+                      />
+                      {/* Gradient Badge Header */}
+                      <div className="absolute top-0 inset-x-0 p-1 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
+                        <span className="w-4 h-4 rounded-full bg-cyan-950 border border-cyan-400 text-cyan-200 font-bold text-[9px] flex items-center justify-center">
+                          {card.grade}
                         </span>
                         {card.shield > 0 && (
-                          <span className="text-emerald-400 font-bold">
+                          <span className="text-[8px] font-bold text-emerald-300 bg-black/60 px-1 rounded">
                             +{card.shield / 1000}k
                           </span>
                         )}
                       </div>
 
-                      {/* Card Center */}
-                      <div className="text-center my-auto">
-                        <div className="text-xs font-black text-white truncate group-hover:text-cyan-300">
-                          {card.nameTh}
-                        </div>
-                        <div className="text-[10px] font-bold text-yellow-400">
+                      {/* Power and Name Footer */}
+                      <div className="absolute bottom-0 inset-x-0 p-1 bg-gradient-to-t from-black/90 to-transparent flex justify-between items-center">
+                        <span className="text-[9px] font-black text-yellow-300">
                           {card.power}
-                        </div>
-                        {card.triggerType && (
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-amber-950 text-amber-300 font-bold">
-                            {card.triggerType}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Action Menu On Hover */}
-                      <div className="flex flex-col gap-1">
-                        <button
-                          onClick={() => handleRide(card, idx)}
-                          className="w-full py-0.5 rounded bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-black text-[9px] uppercase"
-                        >
-                          ไรด์ (Ride)
-                        </button>
-                        <div className="grid grid-cols-2 gap-1 text-[8px]">
-                          <button
-                            onClick={() => handleCallToRear(card, idx, 'fl')}
-                            className="py-0.5 rounded bg-slate-800 hover:bg-emerald-600 text-slate-200"
-                          >
-                            คอล FL
-                          </button>
-                          <button
-                            onClick={() => handleCallToRear(card, idx, 'fr')}
-                            className="py-0.5 rounded bg-slate-800 hover:bg-emerald-600 text-slate-200"
-                          >
-                            คอล FR
-                          </button>
-                        </div>
+                        </span>
+                        <span className="text-[8px] text-slate-200 truncate max-w-[55px]">
+                          {card.nameTh}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -1575,11 +1491,55 @@ export default function VanguardGame({ currentUser }) {
               </div>
             </div>
 
-            {/* ======================================================== */}
-            {/* SIDEBAR: BATTLE LOGS & QUICK ACTIONS                     */}
-            {/* ======================================================== */}
-            <div className="flex flex-col gap-3">
-              {/* Battle Log Box */}
+            {/* SIDEBAR: PREVIEW & BATTLE LOGS (3 COLUMNS) */}
+            <div className="lg:col-span-3 flex flex-col gap-3">
+              {/* Card Hover Detail Preview */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col gap-2">
+                <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                  <Eye className="w-4 h-4" />
+                  <span>ดูรายละเอียดการ์ด (Card Preview)</span>
+                </span>
+                {hoveredCard ? (
+                  <div className="flex gap-2.5 items-start">
+                    <img
+                      src={hoveredCard.artUrl}
+                      alt=""
+                      className="w-20 h-28 object-cover rounded-xl border border-slate-700 shrink-0 shadow-md"
+                    />
+                    <div className="text-xs space-y-1 flex-1">
+                      <h4 className="font-black text-white">{hoveredCard.nameTh}</h4>
+                      <div className="text-[10px] text-slate-400">{hoveredCard.nameEn}</div>
+                      <div className="flex flex-wrap gap-1 text-[9px]">
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-bold">
+                          เกรด {hoveredCard.grade}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-yellow-400 font-bold">
+                          {hoveredCard.power} Power
+                        </span>
+                        {hoveredCard.shield > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400 font-bold">
+                            +{hoveredCard.shield} Shield
+                          </span>
+                        )}
+                        {hoveredCard.triggerType && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 font-bold">
+                            [{hoveredCard.triggerType} Trigger]
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-300 leading-tight pt-1">
+                        {hoveredCard.skills?.[0]?.desc || hoveredCard.flavor || 'ไม่มีสกิล'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-slate-600 text-xs">
+                    ชี้เมาส์ที่การ์ดเพื่อดูรูปใหญ่และรายละเอียดสกิล
+                  </div>
+                )}
+              </div>
+
+              {/* Battle Logs */}
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col flex-1 shadow-lg">
                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs font-bold text-slate-300">
                   <span className="flex items-center gap-1.5 text-cyan-400">
@@ -1593,11 +1553,11 @@ export default function VanguardGame({ currentUser }) {
                     ล้าง
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-1.5 text-xs text-slate-300 font-mono pr-1 max-h-[460px]">
+                <div className="flex-1 overflow-y-auto space-y-1 text-xs text-slate-300 font-mono pr-1 max-h-[380px]">
                   {battleLogs.map((log, i) => (
                     <div
                       key={i}
-                      className={`p-1.5 rounded-lg text-[11px] leading-tight ${
+                      className={`p-1.5 rounded-lg text-[10px] leading-tight ${
                         log.includes('TRIGGER')
                           ? 'bg-amber-950/60 text-amber-300 border border-amber-600/30 font-bold'
                           : log.includes('ไรด์') || log.includes('Stand Up')
@@ -1611,23 +1571,11 @@ export default function VanguardGame({ currentUser }) {
                     </div>
                   ))}
                   {battleLogs.length === 0 && (
-                    <div className="text-center text-slate-600 py-10 text-xs">
+                    <div className="text-center text-slate-600 py-8 text-xs">
                       กดปุ่ม "เริ่มแบทเทิล" เพื่อเข้าสู่การประลอง
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Quick Game Rules Reference Card */}
-              <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-3 text-xs text-slate-400 space-y-1.5">
-                <span className="font-bold text-cyan-400 block mb-1">
-                  ⚡ สรุปกติกาสำคัญ (V-Series):
-                </span>
-                <p>• <strong>สแตนด์:</strong> หมุนการ์ดกลับเป็นแนวตั้งทุกต้นเทิร์น</p>
-                <p>• <strong>ไรด์:</strong> สวมการ์ดเกรดเดิมหรือ +1 ทับแวนการ์ด (ไรด์ G3 ได้มาร์กเกอร์ Force I +10,000 พลัง)</p>
-                <p>• <strong>โจมตี:</strong> สั่งแถวหน้าโจมตี แถวหลังบูสต์พลังเพิ่มได้</p>
-                <p>• <strong>Drive Check:</strong> แวนการ์ดตีได้เปิดการ์ดทริกเกอร์เข้ามือ</p>
-                <p>• <strong>เงื่อนไขแพ้-ชนะ:</strong> โดน 6 ดาเมจ หรือการ์ดหมดกอง = แพ้</p>
               </div>
             </div>
           </div>
@@ -1635,43 +1583,38 @@ export default function VanguardGame({ currentUser }) {
       )}
 
       {/* ======================================================== */}
-      {/* TAB 2: DECK BUILDER (จัดเด็คอิสระตามกฎจริง)             */}
+      {/* TAB 2: DECK BUILDER                                      */}
       {/* ======================================================== */}
       {activeTab === 'deckbuilder' && (
         <div className="flex-1 flex flex-col p-4 max-w-7xl mx-auto w-full gap-4">
-          {/* Deck Stats & Validation Bar */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div>
-                <h2 className="text-base font-black text-white">ระบบจัดเด็คการ์ดอิสระ</h2>
-                <p className="text-xs text-slate-400">
-                  สร้างเด็คตามกฎ Official (50 ใบพอดี / ทริกเกอร์ 16 ใบพอดี / การ์ดชื่อซ้ำไม่เกิน 4 ใบ)
-                </p>
-              </div>
-
-              {/* Status Badge */}
-              <div
-                className={`px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 border ${
-                  isDeckValid
-                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-600/50'
-                    : 'bg-amber-950/80 text-amber-400 border-amber-600/50'
-                }`}
-              >
-                {isDeckValid ? (
-                  <>
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span>เด็คสมบูรณ์ พร้อมลงสนามแข่ง</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-4 h-4 text-amber-400" />
-                    <span>เด็คยังไม่ถูกต้องตามกฎ ({deckStats.totalCards}/50 ใบ)</span>
-                  </>
-                )}
-              </div>
+            <div>
+              <h2 className="text-base font-black text-white">ระบบจัดเด็คการ์ดอิสระ</h2>
+              <p className="text-xs text-slate-400">
+                สร้างเด็คตามกฎ Official (50 ใบพอดี / ทริกเกอร์ 16 ใบพอดี / Heal ไม่เกิน 4 ใบ)
+              </p>
             </div>
 
-            {/* Starter Deck Preset Buttons */}
+            <div
+              className={`px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 border ${
+                isDeckValid
+                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-600/50'
+                  : 'bg-amber-950/80 text-amber-400 border-amber-600/50'
+              }`}
+            >
+              {isDeckValid ? (
+                <>
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>เด็คสมบูรณ์ พร้อมลงสนามแข่ง</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-4 h-4 text-amber-400" />
+                  <span>เด็คยังไม่ถูกต้องตามกฎ ({deckStats.totalCards}/50 ใบ)</span>
+                </>
+              )}
+            </div>
+
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleLoadPreset('royal_paladin')}
@@ -1694,7 +1637,7 @@ export default function VanguardGame({ currentUser }) {
             </div>
           </div>
 
-          {/* Deck Breakdown Indicators */}
+          {/* Breakdown cards */}
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-center">
               <span className="text-[10px] text-slate-400 block font-semibold">จำนวนรวม</span>
@@ -1727,24 +1670,22 @@ export default function VanguardGame({ currentUser }) {
               </span>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-center">
-              <span className="text-[10px] text-slate-400 block font-semibold">เกรด 3 (Twin Drive)</span>
+              <span className="text-[10px] text-slate-400 block font-semibold">เกรด 3</span>
               <span className="text-lg font-black text-cyan-400">{deckStats.grade3} ใบ</span>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-center">
-              <span className="text-[10px] text-slate-400 block font-semibold">เกรด 2 (Intercept)</span>
+              <span className="text-[10px] text-slate-400 block font-semibold">เกรด 2</span>
               <span className="text-lg font-black text-blue-400">{deckStats.grade2} ใบ</span>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-center">
-              <span className="text-[10px] text-slate-400 block font-semibold">เกรด 1 (Boost)</span>
+              <span className="text-[10px] text-slate-400 block font-semibold">เกรด 1</span>
               <span className="text-lg font-black text-indigo-400">{deckStats.grade1} ใบ</span>
             </div>
           </div>
 
-          {/* TWO COLUMNS: LEFT = CARD POOL (FILTER & ADD), RIGHT = CURRENT DECK LIST */}
+          {/* Catalog & Deck List */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
-            {/* Card Pool Catalog */}
             <div className="lg:col-span-8 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-              {/* Filter Controls */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2">
                   <button
@@ -1786,7 +1727,7 @@ export default function VanguardGame({ currentUser }) {
                 </div>
               </div>
 
-              {/* Cards Grid */}
+              {/* Card Catalog With Images */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto max-h-[560px] pr-1">
                 {VANGUARD_CARDS.filter(
                   (c) =>
@@ -1799,44 +1740,40 @@ export default function VanguardGame({ currentUser }) {
                   return (
                     <div
                       key={card.id}
-                      className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between hover:border-cyan-500 transition shadow-md group relative"
+                      className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col justify-between hover:border-cyan-500 transition shadow-md group relative"
                     >
-                      <div>
-                        <div className="flex justify-between items-center text-[10px] mb-1">
-                          <span className="px-1.5 py-0.5 rounded bg-slate-800 font-bold text-cyan-300">
-                            Grade {card.grade}
-                          </span>
-                          <span className="text-yellow-400 font-bold">
-                            {card.power} Atk
-                          </span>
+                      <div className="w-full h-44 relative overflow-hidden">
+                        <img
+                          src={card.artUrl}
+                          alt={card.nameTh}
+                          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/80 text-cyan-300 font-bold text-[10px]">
+                          G{card.grade}
                         </div>
-                        <h4 className="text-xs font-black text-white truncate mb-1">
-                          {card.nameTh}
-                        </h4>
-                        <div className="text-[10px] text-slate-400 truncate mb-2">
-                          {card.nameEn}
+                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-yellow-300 font-bold text-[10px]">
+                          {card.power} Power
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] text-slate-400">
-                          <span>โล่: {card.shield ? `+${card.shield / 1000}k` : '-'}</span>
+                      <div className="p-2 space-y-1.5">
+                        <h4 className="text-xs font-black text-white truncate">{card.nameTh}</h4>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
                           <span>{card.triggerType ? `[${card.triggerType}]` : card.skillType}</span>
+                          <span>ในเด็ค: {countInDeck}/4</span>
                         </div>
-                        <div className="flex items-center gap-1.5 pt-1 border-t border-slate-800">
-                          <button
-                            onClick={() => handleAddCardToDeck(card.id)}
-                            disabled={countInDeck >= 4}
-                            className={`flex-1 py-1 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
-                              countInDeck >= 4
-                                ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-                                : 'bg-cyan-600 hover:bg-cyan-500 text-slate-950 cursor-pointer'
-                            }`}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>ใส่เด็ค ({countInDeck}/4)</span>
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => handleAddCardToDeck(card.id)}
+                          disabled={countInDeck >= 4}
+                          className={`w-full py-1 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
+                            countInDeck >= 4
+                              ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                              : 'bg-cyan-600 hover:bg-cyan-500 text-slate-950 cursor-pointer'
+                          }`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>ใส่เด็ค</span>
+                        </button>
                       </div>
                     </div>
                   )
@@ -1844,7 +1781,7 @@ export default function VanguardGame({ currentUser }) {
               </div>
             </div>
 
-            {/* Current Deck Roster */}
+            {/* Current Deck Column */}
             <div className="lg:col-span-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xl">
               <div>
                 <h3 className="text-sm font-black text-white mb-2 flex items-center justify-between">
@@ -1860,18 +1797,20 @@ export default function VanguardGame({ currentUser }) {
                     return (
                       <div
                         key={item.cardId}
-                        className="bg-slate-950 border border-slate-800/80 rounded-xl p-2 flex items-center justify-between text-xs"
+                        className="bg-slate-950 border border-slate-800/80 rounded-xl p-1.5 flex items-center justify-between text-xs"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded bg-slate-800 text-cyan-300 font-bold flex items-center justify-center text-[10px]">
-                            G{card.grade}
-                          </span>
+                          <img
+                            src={card.artUrl}
+                            alt=""
+                            className="w-8 h-10 object-cover rounded-md shrink-0"
+                          />
                           <div>
                             <div className="font-bold text-white truncate max-w-[130px]">
                               {card.nameTh}
                             </div>
-                            <span className="text-[10px] text-slate-500">
-                              {card.triggerType ? `[${card.triggerType}]` : `${card.power} Atk`}
+                            <span className="text-[10px] text-slate-400">
+                              G{card.grade} | {card.triggerType ? `[${card.triggerType}]` : `${card.power} Power`}
                             </span>
                           </div>
                         </div>
@@ -1880,7 +1819,7 @@ export default function VanguardGame({ currentUser }) {
                           <span className="font-black text-cyan-400">x{item.count}</span>
                           <button
                             onClick={() => handleRemoveCardFromDeck(item.cardId)}
-                            className="p-1 rounded bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 transition"
+                            className="p-1 rounded bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 transition cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1888,15 +1827,9 @@ export default function VanguardGame({ currentUser }) {
                       </div>
                     )
                   })}
-                  {customDeckCards.length === 0 && (
-                    <div className="text-center py-12 text-slate-600 text-xs">
-                      ยังไม่มีการ์ดในเด็ค คลิกปุ่ม "ใส่เด็ค" เพื่อเพิ่มการ์ด
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Action Button: Apply Deck to Battle */}
               <button
                 disabled={!isDeckValid}
                 onClick={() => {
@@ -1920,7 +1853,7 @@ export default function VanguardGame({ currentUser }) {
       )}
 
       {/* ======================================================== */}
-      {/* TAB 3: RULEBOOK (กติกาการเล่นอย่างละเอียด)                 */}
+      {/* TAB 3: RULEBOOK                                          */}
       {/* ======================================================== */}
       {activeTab === 'rulebook' && (
         <div className="flex-1 p-4 max-w-4xl mx-auto w-full space-y-4">
@@ -1935,10 +1868,9 @@ export default function VanguardGame({ currentUser }) {
                 <ol className="list-decimal pl-4 space-y-1">
                   <li><strong>Stand Phase:</strong> สแตนด์การ์ดทุกใบที่นอนอยู่ (Rest) ให้กลับมาเป็นแนวตั้ง</li>
                   <li><strong>Draw Phase:</strong> จั่วการ์ด 1 ใบจากกอง</li>
-                  <li><strong>Ride Phase:</strong> ไรด์ยูนิตเกรดเดิมหรือเกรด +1 ทับแวนการ์ด (ยูนิตเดิมจะลงไปอยู่ใน Soul)</li>
-                  <li><strong>Main Phase:</strong> คอลเรียร์การ์ดลงช่อง RG (เกรดต้องไม่เกินแวนการ์ด), สั่งใช้สกิล ACT</li>
-                  <li><strong>Battle Phase:</strong> สั่งยูนิตแถวหน้าโจมตี, สั่งแถวหลังบูสต์, ฝ่ายรับกางการ์ดป้องกัน, ทำ Drive Check / Damage Check</li>
-                  <li><strong>End Phase:</strong> ส่งการ์เดี้ยนลง Drop Zone, คืนค่าพลังที่บวกในเทิร์น, สลับเทิร์นให้คู่ต่อสู้</li>
+                  <li><strong>Ride Phase / Main Phase:</strong> <strong>ลากการ์ดจากมือไปวางบน Vanguard (VC)</strong> เพื่อไรด์ หรือลากไปวางบน <strong>Rear-guard (RC ทั้งแถวหน้า FL, FR และแถวหลัง BL, BC, BR)</strong></li>
+                  <li><strong>Battle Phase:</strong> สั่งยูนิตแถวหน้าโจมตี, สั่งแถวหลังบูสต์, ลากการ์ดเข้าช่อง Guard ป้องกัน, ทำ Drive Check / Damage Check</li>
+                  <li><strong>End Phase:</strong> ส่งการ์เดี้ยนลง Drop Zone, สลับเทิร์นให้คู่ต่อสู้</li>
                 </ol>
               </div>
 
@@ -1948,14 +1880,13 @@ export default function VanguardGame({ currentUser }) {
                   <li><strong>Critical Trigger (สีแดง):</strong> พลัง +10,000 และเพิ่มค่าคริติคอล +1 (โจมตีเข้าโดน 2 ดาเมจ!)</li>
                   <li><strong>Draw Trigger (สีส้ม):</strong> พลัง +10,000 และจั่วการ์ด 1 ใบขึ้นมือทันที</li>
                   <li><strong>Heal Trigger (สีเขียว):</strong> พลัง +10,000 และรักษาดาเมจ 1 เม็ดลง Drop Zone (ต้องมีดาเมจ $\ge$ คู่ต่อสู้)</li>
-                  <li><strong>Front Trigger (สีชมพู):</strong> เพิ่มพลัง +10,000 ให้กับยูนิตแถวหน้าทั้งหมดของคุณ</li>
                 </ul>
               </div>
 
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                 <h3 className="font-bold text-purple-400 text-sm mb-1">3. Imaginary Gift: Force (เฉพาะ V-Series)</h3>
                 <p>
-                  เมื่อทำการไรด์ยูนิตเกรด 3 ที่มีสัญลักษณ์ <strong>Force</strong> คุณจะได้รับมาร์กเกอร์ Force วางลงบนช่องวงกลม (Vanguard Circle) ซึ่งจะมอบพลังโจมตี <strong>+10,000 ตลอดทั้งเกม</strong> ในเทิร์นของคุณ!
+                  เมื่อทำการไรด์ยูนิตเกรด 3 ที่มีสัญลักษณ์ <strong>Force</strong> คุณจะได้รับมาร์กเกอร์ Force วางลงบนช่อง Vanguard Circle ซึ่งจะมอบพลังโจมตี <strong>+10,000 ตลอดทั้งเกม</strong> ในเทิร์นของคุณ!
                 </p>
               </div>
             </div>

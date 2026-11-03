@@ -1,4 +1,4 @@
-// ข้อมูลการ์ด Cardfight!! Vanguard V-Series (Official Stats & Skills)
+// ข้อมูลการ์ด Cardfight!! Vanguard V-Series (Official Stats, Real Art & Skills)
 // รองรับแคลน Royal Paladin (ไอจิ เซ็นโด) และ Kagero (ไค โทชิกิ)
 
 export const VANGUARD_CARDS = [
@@ -20,7 +20,7 @@ export const VANGUARD_CARDS = [
     gift: 'Force',
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-bt01/v-bt01-001.jpg',
+    artUrl: '/vanguard/alfred.png',
     flavor: 'แสงสว่างแห่งความยุติธรรม นำทางเหล่าอัศวินสู่อนาคต!',
     skills: [
       {
@@ -52,7 +52,7 @@ export const VANGUARD_CARDS = [
     gift: 'Force',
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-bt01/v-bt01-002.jpg',
+    artUrl: '/vanguard/soul-saver.png',
     flavor: 'แสงแห่งวิญญาณเอ๋ย จงมอบพลังศักดิ์สิทธิ์แก่เหล่าสหายศึก!',
     skills: [
       {
@@ -78,7 +78,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-004.jpg',
+    artUrl: '/vanguard/blaster-blade.png',
     flavor: 'จงลุกขึ้นมา ร่างอวตารของฉัน! บลัสเตอร์ เบลด!',
     skills: [
       {
@@ -110,7 +110,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-005.jpg',
+    artUrl: '/vanguard/v-td01-005.png',
     flavor: 'ความเงียบสงบคือโล่ที่แข็งแกร่งที่สุดในสนามรบ',
     skills: [],
   },
@@ -129,7 +129,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-bt01/v-bt01-014.jpg',
+    artUrl: '/vanguard/akane.png',
     flavor: 'ออกไปช่วยสหายของเราเถอะ เหล่าไฮด็อกแสนรู้!',
     skills: [
       {
@@ -155,7 +155,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-007.jpg',
+    artUrl: '/vanguard/wingal.png',
     flavor: 'ปีกสีขาวที่จะโผบินเคียงข้างบลัสเตอร์เบลดเสมอ!',
     skills: [
       {
@@ -181,7 +181,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-008.jpg',
+    artUrl: '/vanguard/v-td01-008.png',
     flavor: 'ความจงรักภักดีที่จะคอยส่งเสริมพลังงานศักดิ์สิทธิ์',
     skills: [
       {
@@ -207,13 +207,13 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-009.jpg',
+    artUrl: '/vanguard/v-td01-009.png',
     flavor: 'คมดาบกุหลาบอันสง่างามแห่งราชอาณาจักร',
     skills: [],
   },
   {
     id: 'rp-g1-04',
-    code: 'V-TD01/010',
+    code: 'V-TD01/006',
     nameTh: 'โล่ประกายแสง, อิโซลด์ (เพอร์เฟกต์การ์ด)',
     nameEn: 'Flash Shield, Iseult',
     clan: 'Royal Paladin',
@@ -226,7 +226,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Draw / Sentinel',
     triggerType: 'Draw',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-010.jpg',
+    artUrl: '/vanguard/v-td01-006.png',
     flavor: 'ม่านพลังศักดิ์สิทธิ์ ป้องกันการโจมตีอันตรายได้สมบูรณ์แบบ!',
     skills: [
       {
@@ -252,7 +252,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'First Vanguard',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-011.jpg',
+    artUrl: '/vanguard/v-td01-011.png',
     flavor: 'จุดเริ่มต้นแห่งการเดินทางของเหล่าอัศวิน',
     skills: [
       {
@@ -278,7 +278,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Trigger Unit',
     triggerType: 'Critical',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-012.jpg',
+    artUrl: '/vanguard/v-td01-012.png',
     flavor: 'ผีเสื้อสีชาด นำพาดาเมจทะลวงคริติคอล!',
     skills: [],
   },
@@ -297,7 +297,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Trigger Unit',
     triggerType: 'Critical',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-013.jpg',
+    artUrl: '/vanguard/v-td01-013.png',
     flavor: 'แสงวาบสะท้อนดาบ ฟันทะลวงเกราะ!',
     skills: [],
   },
@@ -316,7 +316,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Trigger Unit',
     triggerType: 'Draw',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-014.jpg',
+    artUrl: '/vanguard/v-td01-014.png',
     flavor: 'อาวุธใหม่พร้อมส่งมอบให้บนมือคุณเสมอ',
     skills: [],
   },
@@ -335,7 +335,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Trigger Unit',
     triggerType: 'Heal',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td01/v-td01-015.jpg',
+    artUrl: '/vanguard/v-td01-015.png',
     flavor: 'พลังแห่งพฤกษา ฟื้นฟูความเสียหายและรักษาจิตใจ',
     skills: [],
   },
@@ -358,7 +358,7 @@ export const VANGUARD_CARDS = [
     gift: 'Force',
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-001.jpg',
+    artUrl: '/vanguard/dragonic-overlord.png',
     flavor: 'จงเผาผลาญทุกสิ่งให้เป็นเถ้าถ่าน เปลวเพลิงแห่งการทำลายล้าง!',
     skills: [
       {
@@ -377,7 +377,7 @@ export const VANGUARD_CARDS = [
   },
   {
     id: 'kg-g3-02',
-    code: 'V-BT01/005',
+    code: 'V-TD02/002',
     nameTh: 'ดราโกนิค วอเตอร์ฟอลล์',
     nameEn: 'Dragonic Waterfall',
     clan: 'Kagero',
@@ -390,7 +390,7 @@ export const VANGUARD_CARDS = [
     gift: 'Force',
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-bt01/v-bt01-005.jpg',
+    artUrl: '/vanguard/v-td02-002.png',
     flavor: 'สายน้ำตกแห่งเพลิงกาฬที่จะกลืนกินทุกการป้องกัน!',
     skills: [
       {
@@ -416,7 +416,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-003.jpg',
+    artUrl: '/vanguard/nehalem.png',
     flavor: 'คมดาบเพลิงอันซื่อสัตย์แห่งกองทัพจักรวรรดิมังกร',
     skills: [
       {
@@ -442,7 +442,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-bt01/v-bt01-017.jpg',
+    artUrl: '/vanguard/berserk-dragon.png',
     flavor: 'ความบ้าคลั่งที่พร้อมฉีกกระชากแนวรบศัตรู',
     skills: [
       {
@@ -468,7 +468,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-004.jpg',
+    artUrl: '/vanguard/v-td02-004.png',
     flavor: 'เพลิงที่เอ่อล้นพร้อมแผดเผาผู้ขวางทาง',
     skills: [],
   },
@@ -487,7 +487,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-006.jpg',
+    artUrl: '/vanguard/bahr.png',
     flavor: 'เกราะเหล็กเพลิงที่ไม่มีวันมอดดับ!',
     skills: [
       {
@@ -500,7 +500,7 @@ export const VANGUARD_CARDS = [
   },
   {
     id: 'kg-g1-02',
-    code: 'V-BT01/030',
+    code: 'V-TD02/007',
     nameTh: 'ดรากอน มังค์, โกโจ',
     nameEn: 'Dragon Monk, Gojo',
     clan: 'Kagero',
@@ -513,7 +513,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Normal Unit',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-bt01/v-bt01-030.jpg',
+    artUrl: '/vanguard/v-td02-007.png',
     flavor: 'สมาธิอันแน่วแน่ นำพาการ์ดใหม่สู่มือ',
     skills: [
       {
@@ -539,7 +539,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Draw / Sentinel',
     triggerType: 'Draw',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-008.jpg',
+    artUrl: '/vanguard/v-td02-008.png',
     flavor: 'เกราะมังกรไวเวิร์น ป้องกันการโจมตีระดับหายนะ!',
     skills: [
       {
@@ -565,7 +565,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'First Vanguard',
     triggerType: null,
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-010.jpg',
+    artUrl: '/vanguard/undeux.png',
     flavor: 'ผู้สอดแนมแห่งกองทัพมังกรเพลิง',
     skills: [
       {
@@ -591,7 +591,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Trigger Unit',
     triggerType: 'Critical',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-011.jpg',
+    artUrl: '/vanguard/v-td02-011.png',
     flavor: 'เปลวไฟเฉือนทะลุเกราะ คริติคอลทริกเกอร์!',
     skills: [],
   },
@@ -610,7 +610,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Trigger Unit',
     triggerType: 'Critical',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-012.jpg',
+    artUrl: '/vanguard/v-td02-012.png',
     flavor: 'เพลิงมารลุกโชน!',
     skills: [],
   },
@@ -629,7 +629,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Trigger Unit',
     triggerType: 'Draw',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-013.jpg',
+    artUrl: '/vanguard/v-td02-013.png',
     flavor: 'อัญมณีสีชาดเติมเต็มพลังบนมือ',
     skills: [],
   },
@@ -648,7 +648,7 @@ export const VANGUARD_CARDS = [
     gift: null,
     cardType: 'Trigger Unit',
     triggerType: 'Heal',
-    artUrl: 'https://images.saythecard.com/vanguard/cards/en/v-td02/v-td02-014.jpg',
+    artUrl: '/vanguard/v-td02-014.png',
     flavor: 'บทสวดแห่งมังกร เยียวยาทุกบาดแผล',
     skills: [],
   },
@@ -667,7 +667,6 @@ export const PRESET_DECKS = {
     bannerColor: 'from-blue-600 via-indigo-700 to-sky-900',
     description: 'เด็คยอดนิยมของ ไอจิ เซ็นโด นำทัพโดย "Blaster Blade" และ "King of Knights, Alfred" เน้นเสริมพลังสหายและพลัง Force I',
     firstVanguardId: 'rp-g0-01',
-    // 50 ใบพอดี (G3: 8 ใบ, G2: 11 ใบ, G1: 14 ใบ, G0 Triggers: 16 ใบ, First VG: 1 ใบ)
     cardList: [
       { cardId: 'rp-g3-01', count: 4 }, // Alfred x4
       { cardId: 'rp-g3-02', count: 4 }, // Soul Saver x4
@@ -693,7 +692,6 @@ export const PRESET_DECKS = {
     bannerColor: 'from-red-600 via-orange-700 to-amber-950',
     description: 'เด็คของ ไค โทชิกิ นำทัพโดย "Dragonic Overlord" สุดยอดมังกรเพลิงที่สามารถสแตนด์ตีซ้ำได้ พร้อมการทำลายล้างริไทร์การ์ดศัตรู',
     firstVanguardId: 'kg-g0-01',
-    // 50 ใบพอดี
     cardList: [
       { cardId: 'kg-g3-01', count: 4 }, // Dragonic Overlord x4
       { cardId: 'kg-g3-02', count: 4 }, // Dragonic Waterfall x4
