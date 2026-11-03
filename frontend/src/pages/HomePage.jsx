@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pin, Palette, Sparkles, Rocket, Check, ArrowRight } from 'lucide-react'
+import { Pin, Palette, Sparkles, Rocket, Check, ArrowRight, Zap, Play } from 'lucide-react'
 import realisticHero from '../assets/realistic-hero.jpg'
 
 function Homepage({ setCurrentPage }) {
@@ -169,6 +169,40 @@ function Homepage({ setCurrentPage }) {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+
+      {/* 🚀 ไฮไลท์เกมใหม่: Ben 10: Savage Pursuit (Retro Remake) */}
+      <section className="bg-gradient-to-r from-gray-900 via-emerald-950 to-black rounded-3xl p-6 sm:p-8 border-2 border-green-500/60 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="absolute -top-12 -right-12 w-64 h-64 bg-green-500/20 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="flex items-center gap-5 z-10">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-black/80 border-2 border-green-400 p-2 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(34,197,94,0.4)]">
+            <img src="/ben10/title.png" alt="Ben 10" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-900/80 border border-green-400 text-green-300 text-xs font-bold mb-2">
+              <Zap className="w-3.5 h-3.5 text-green-400 fill-current" />
+              <span>NEW RETRO GAME RELEASE</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">
+              BEN 10: SAVAGE PURSUIT
+            </h2>
+            <p className="text-gray-300 text-xs sm:text-sm mt-1 max-w-xl">
+              คืนชีพเกมแฟลชระดับตำนาน! หมุนหน้าปัด Omnitrix แปลงร่างเป็น Heatblast, Cannonbolt, Wildvine และ Wildmutt เพื่อผจญภัยในป่าดึกดำบรรพ์
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0 z-10 w-full md:w-auto">
+          <button
+            onClick={() => setCurrentPage('ben10')}
+            className="w-full md:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-lime-500 to-green-600 hover:from-lime-400 hover:to-green-500 text-black font-black text-sm tracking-wider shadow-lg hover:scale-105 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            <span>เข้าเล่นเกมเบ็นเท็น</span>
+          </button>
         </div>
       </section>
 

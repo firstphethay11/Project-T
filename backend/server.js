@@ -470,6 +470,39 @@ app.post('/api/register', async (req, res) => {
   }
 })
 
+// ==========================================
+// 🎮 API ระบบบันทึกคะแนนเกม (Leaderboard)
+// ==========================================
+app.get('/api/scores', async (req, res) => {
+  const game = req.query.game || 'ben10'
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, username, game_name, score, created_at FROM game_scores WHERE game_name = ? ORDER BY score DESC LIMIT 10',
+      [game]
+    )
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/scores', async (req, res) => {
+  const { username, game_name, score } = req.body
+  if (!username || score === undefined) {
+    return res.status(400).json({ error: 'Missing username or score' })
+  }
+
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO game_scores (username, game_name, score) VALUES (?, ?, ?)',
+      [username, game_name || 'ben10', Number(score)]
+    )
+    res.status(201).json({ success: true, insertId: result.insertId })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`)
 })

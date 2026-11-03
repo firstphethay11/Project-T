@@ -11,6 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Map,
+  Zap,
 } from 'lucide-react'
 
 function Aside({ currentPage, setCurrentPage }) {
@@ -23,6 +24,7 @@ function Aside({ currentPage, setCurrentPage }) {
     { id: 'about', label: 'สมาชิกในทีม (About)', icon: Users },
     { id: 'game', label: 'เกมเศรษฐี (Game)', icon: Gamepad2 },
     { id: 'werewolf', label: 'เกมแวร์วูล์ฟ (Werewolf)', icon: Moon },
+    { id: 'ben10', label: 'เกมเบ็นเท็น (Ben 10)', icon: Zap },
     { id: 'uno', label: 'เกมไพ่ UNO (UNO Game)', icon: Flame },
     { id: 'login', label: 'เข้าสู่ระบบ (MySQL Login)', icon: LogIn },
   ]

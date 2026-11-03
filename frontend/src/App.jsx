@@ -10,6 +10,7 @@ import WerewolfGame from './pages/WerewolfGame'
 import UnoGame from './pages/UnoGame'
 import LoginPage from './pages/LoginPage'
 import MapPage from './pages/MapPage'
+import Ben10Game from './pages/Ben10Game'
 
 function App() {
   // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'map', 'about', 'guide', 'game', 'werewolf', 'uno', หรือ 'login')
@@ -29,7 +30,7 @@ function App() {
   }
 
   const isGameView =
-    currentPage === 'game' || currentPage === 'werewolf' || currentPage === 'uno'
+    currentPage === 'game' || currentPage === 'werewolf' || currentPage === 'uno' || currentPage === 'ben10'
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
@@ -61,6 +62,7 @@ function App() {
             }`}
           >
             {currentPage === 'home' && <HomePage setCurrentPage={setCurrentPage} />}
+            {currentPage === 'ben10' && <Ben10Game currentUser={currentUser} />}
             {currentPage === 'map' && <MapPage />}
             {currentPage === 'about' && <AboutPage />}
             {currentPage === 'guide' && <GuidePage setCurrentPage={setCurrentPage} />}
