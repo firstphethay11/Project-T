@@ -4,6 +4,7 @@ import {
   Users,
   Gamepad2,
   Moon,
+  Flame,
   LogIn,
   FolderGit2,
   Settings,
@@ -20,6 +21,7 @@ function Aside({ currentPage, setCurrentPage }) {
     { id: 'about', label: 'สมาชิกในทีม (About)', icon: Users },
     { id: 'game', label: 'เกมเศรษฐี (Game)', icon: Gamepad2 },
     { id: 'werewolf', label: 'เกมแวร์วูล์ฟ (Werewolf)', icon: Moon },
+    { id: 'uno', label: 'เกมไพ่ UNO (UNO Game)', icon: Flame },
     { id: 'login', label: 'เข้าสู่ระบบ (MySQL Login)', icon: LogIn },
   ]
 
