@@ -16,7 +16,7 @@ function Navbar({ currentPage, setCurrentPage }) {
             onClick={() => setCurrentPage('home')}
             className={`px-4 py-2 rounded-lg font-medium transition ${
               currentPage === 'home'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-emerald-600 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -27,7 +27,7 @@ function Navbar({ currentPage, setCurrentPage }) {
             onClick={() => setCurrentPage('about')}
             className={`px-4 py-2 rounded-lg font-medium transition ${
               currentPage === 'about'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-emerald-600 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
