@@ -60,7 +60,7 @@ function App() {
               currentPage === 'vanguard'
                 ? 'w-full px-1 sm:px-2 py-1 flex flex-col justify-center'
                 : currentPage === 'game'
-                ? 'max-w-[1480px] px-2 sm:px-4 py-2 sm:py-3 flex flex-col justify-center'
+                ? 'max-w-[1520px] w-full px-1.5 sm:px-3 py-1 sm:py-2 flex flex-col justify-center'
                 : currentPage === 'cardbattle'
                 ? 'max-w-[1480px] w-full px-2 py-1 flex flex-col h-[calc(100vh-4rem)] min-h-0 overflow-hidden'
                 : currentPage === 'uno'

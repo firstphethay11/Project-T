@@ -31,57 +31,112 @@ import {
   Trash2,
   X,
   Info,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 
-// รายการช่องเดินบนกระดาน 40 ช่อง (11 x 11 Grid)
+// Web Audio API Synthesis สำหรับเสียงเอฟเฟกต์ในเกม (ลูกเต๋า, เหรียญ, ซื้อที่ดิน, เตือน)
+const playSound = (type, enabled = true) => {
+  if (!enabled) return
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    if (type === 'dice') {
+      for (let i = 0; i < 4; i++) {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(220 + Math.random() * 250, ctx.currentTime + i * 0.06)
+        gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.06)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.06 + 0.05)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(ctx.currentTime + i * 0.06)
+        osc.stop(ctx.currentTime + i * 0.06 + 0.05)
+      }
+    } else if (type === 'coin') {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(987.77, ctx.currentTime)
+      osc.frequency.setValueAtTime(1318.51, ctx.currentTime + 0.08)
+      gain.gain.setValueAtTime(0.18, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.3)
+    } else if (type === 'buy') {
+      [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.06)
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.06)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + idx * 0.06 + 0.16)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(ctx.currentTime + idx * 0.06)
+        osc.stop(ctx.currentTime + idx * 0.06 + 0.16)
+      })
+    } else if (type === 'warn') {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(160, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.22)
+      gain.gain.setValueAtTime(0.18, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.22)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.22)
+    }
+  } catch {
+    // AudioContext blocked or unsupported
+  }
+}
+
+// รายการช่องเดินบนกระดาน 32 ช่อง (9 x 9 Grid สไตล์ LINE เกมเศรษฐี)
 const INITIAL_TILES = [
-  // ด้านซ้าย ล่างขึ้นบน (แถว 11 -> 1, คอลัมน์ 1)
-  { id: 0, name: 'จุดเริ่มต้น', type: 'start', price: 0, rent: 0, color: 'bg-emerald-600', icon: Flag, gridPos: 'row-start-11 col-start-1' },
-  { id: 1, name: 'ลำปาง', type: 'property', price: 600, rent: 150, color: 'bg-amber-800', group: 'น้ำตาล', gridPos: 'row-start-10 col-start-1' },
-  { id: 2, name: 'หีบสมบัติ', type: 'chance', price: 0, rent: 0, color: 'bg-purple-500', icon: Gift, gridPos: 'row-start-9 col-start-1' },
-  { id: 3, name: 'พิษณุโลก', type: 'property', price: 800, rent: 200, color: 'bg-amber-800', group: 'น้ำตาล', gridPos: 'row-start-8 col-start-1' },
-  { id: 4, name: 'ภาษีรายได้', type: 'tax', price: 500, rent: 0, color: 'bg-rose-500', icon: ReceiptText, gridPos: 'row-start-7 col-start-1' },
-  { id: 5, name: 'สถานีบางซื่อ', type: 'transport', price: 2000, rent: 400, color: 'bg-slate-700', icon: Train, gridPos: 'row-start-6 col-start-1' },
-  { id: 6, name: 'เชียงราย', type: 'property', price: 1000, rent: 250, color: 'bg-sky-400', group: 'ฟ้าอ่อน', gridPos: 'row-start-5 col-start-1' },
-  { id: 7, name: 'การ์ดโอกาส', type: 'chance', price: 0, rent: 0, color: 'bg-orange-500', icon: HelpCircle, gridPos: 'row-start-4 col-start-1' },
-  { id: 8, name: 'เชียงใหม่', type: 'property', price: 1200, rent: 300, color: 'bg-sky-400', group: 'ฟ้าอ่อน', gridPos: 'row-start-3 col-start-1' },
-  { id: 9, name: 'แม่ฮ่องสอน', type: 'property', price: 1400, rent: 350, color: 'bg-sky-400', group: 'ฟ้าอ่อน', gridPos: 'row-start-2 col-start-1' },
-  { id: 10, name: 'เรือนจำ / พัก', type: 'jail', price: 0, rent: 0, color: 'bg-slate-800', icon: ShieldAlert, gridPos: 'row-start-1 col-start-1' },
+  // ด้านซ้าย ล่างขึ้นบน (แถว 9 -> 1, คอลัมน์ 1)
+  { id: 0, name: 'จุดเริ่มต้น', type: 'start', price: 0, rent: 0, color: 'bg-emerald-600', icon: Flag, gridPos: 'row-start-9 col-start-1' },
+  { id: 1, name: 'ลำปาง', type: 'property', price: 600, rent: 150, color: 'bg-amber-800', group: 'น้ำตาล', gridPos: 'row-start-8 col-start-1' },
+  { id: 2, name: 'หีบสมบัติ', type: 'chance', price: 0, rent: 0, color: 'bg-purple-500', icon: Gift, gridPos: 'row-start-7 col-start-1' },
+  { id: 3, name: 'พิษณุโลก', type: 'property', price: 800, rent: 200, color: 'bg-amber-800', group: 'น้ำตาล', gridPos: 'row-start-6 col-start-1' },
+  { id: 4, name: 'สถานีบางซื่อ', type: 'transport', price: 2000, rent: 400, color: 'bg-slate-700', icon: Train, gridPos: 'row-start-5 col-start-1' },
+  { id: 5, name: 'เชียงราย', type: 'property', price: 1000, rent: 250, color: 'bg-sky-400', group: 'ฟ้าอ่อน', gridPos: 'row-start-4 col-start-1' },
+  { id: 6, name: 'การ์ดโอกาส', type: 'chance', price: 0, rent: 0, color: 'bg-orange-500', icon: HelpCircle, gridPos: 'row-start-3 col-start-1' },
+  { id: 7, name: 'เชียงใหม่', type: 'property', price: 1200, rent: 300, color: 'bg-sky-400', group: 'ฟ้าอ่อน', gridPos: 'row-start-2 col-start-1' },
+  { id: 8, name: 'เกาะร้าง / คุก', type: 'jail', price: 0, rent: 0, color: 'bg-slate-800', icon: ShieldAlert, gridPos: 'row-start-1 col-start-1' },
 
-  // ด้านบน ซ้ายไปขวา (แถว 1, คอลัมน์ 2 -> 11)
-  { id: 11, name: 'ชลบุรี', type: 'property', price: 1600, rent: 400, color: 'bg-pink-500', group: 'ชมพู', gridPos: 'row-start-1 col-start-2' },
-  { id: 12, name: 'การประปา', type: 'utility', price: 1500, rent: 300, color: 'bg-cyan-600', icon: Droplets, gridPos: 'row-start-1 col-start-3' },
-  { id: 13, name: 'พัทยา', type: 'property', price: 1800, rent: 450, color: 'bg-pink-500', group: 'ชมพู', gridPos: 'row-start-1 col-start-4' },
-  { id: 14, name: 'ระยอง', type: 'property', price: 2000, rent: 500, color: 'bg-pink-500', group: 'ชมพู', gridPos: 'row-start-1 col-start-5' },
-  { id: 15, name: 'สนามบินดอนเมือง', type: 'transport', price: 2000, rent: 400, color: 'bg-slate-700', icon: Plane, gridPos: 'row-start-1 col-start-6' },
-  { id: 16, name: 'นครราชสีมา', type: 'property', price: 2200, rent: 500, color: 'bg-amber-500', group: 'ส้ม', gridPos: 'row-start-1 col-start-7' },
-  { id: 17, name: 'หีบสมบัติ', type: 'chance', price: 0, rent: 0, color: 'bg-purple-500', icon: Gift, gridPos: 'row-start-1 col-start-8' },
-  { id: 18, name: 'ขอนแก่น', type: 'property', price: 2400, rent: 550, color: 'bg-amber-500', group: 'ส้ม', gridPos: 'row-start-1 col-start-9' },
-  { id: 19, name: 'อุดรธานี', type: 'property', price: 2600, rent: 600, color: 'bg-amber-500', group: 'ส้ม', gridPos: 'row-start-1 col-start-10' },
-  { id: 20, name: 'เกาะพักผ่อน', type: 'rest', price: 0, rent: 0, color: 'bg-teal-600', icon: Palmtree, gridPos: 'row-start-1 col-start-11' },
+  // ด้านบน ซ้ายไปขวา (แถว 1, คอลัมน์ 2 -> 9)
+  { id: 9, name: 'ชลบุรี', type: 'property', price: 1600, rent: 400, color: 'bg-pink-500', group: 'ชมพู', gridPos: 'row-start-1 col-start-2' },
+  { id: 10, name: 'การประปา', type: 'utility', price: 1500, rent: 300, color: 'bg-cyan-600', icon: Droplets, gridPos: 'row-start-1 col-start-3' },
+  { id: 11, name: 'พัทยา', type: 'property', price: 1800, rent: 450, color: 'bg-pink-500', group: 'ชมพู', gridPos: 'row-start-1 col-start-4' },
+  { id: 12, name: 'นครราชสีมา', type: 'property', price: 2200, rent: 500, color: 'bg-amber-500', group: 'ส้ม', gridPos: 'row-start-1 col-start-5' },
+  { id: 13, name: 'หีบสมบัติ', type: 'chance', price: 0, rent: 0, color: 'bg-purple-500', icon: Gift, gridPos: 'row-start-1 col-start-6' },
+  { id: 14, name: 'ขอนแก่น', type: 'property', price: 2400, rent: 550, color: 'bg-amber-500', group: 'ส้ม', gridPos: 'row-start-1 col-start-7' },
+  { id: 15, name: 'อุดรธานี', type: 'property', price: 2600, rent: 600, color: 'bg-amber-500', group: 'ส้ม', gridPos: 'row-start-1 col-start-8' },
+  { id: 16, name: 'เกาะพักผ่อน', type: 'rest', price: 0, rent: 0, color: 'bg-teal-600', icon: Palmtree, gridPos: 'row-start-1 col-start-9' },
 
-  // ด้านขวา บนลงล่าง (แถว 2 -> 11, คอลัมน์ 11)
-  { id: 21, name: 'กระบี่', type: 'property', price: 2800, rent: 700, color: 'bg-red-500', group: 'แดง', gridPos: 'row-start-2 col-start-11' },
-  { id: 22, name: 'การ์ดโอกาส', type: 'chance', price: 0, rent: 0, color: 'bg-orange-500', icon: HelpCircle, gridPos: 'row-start-3 col-start-11' },
-  { id: 23, name: 'พังงา', type: 'property', price: 3000, rent: 750, color: 'bg-red-500', group: 'แดง', gridPos: 'row-start-4 col-start-11' },
-  { id: 24, name: 'ภูเก็ต', type: 'property', price: 3200, rent: 800, color: 'bg-red-500', group: 'แดง', gridPos: 'row-start-5 col-start-11' },
-  { id: 25, name: 'สนามบินสุวรรณภูมิ', type: 'transport', price: 2000, rent: 400, color: 'bg-slate-700', icon: Plane, gridPos: 'row-start-6 col-start-11' },
-  { id: 26, name: 'สุราษฎร์ธานี', type: 'property', price: 3400, rent: 850, color: 'bg-yellow-500', group: 'เหลือง', gridPos: 'row-start-7 col-start-11' },
-  { id: 27, name: 'เกาะสมุย', type: 'property', price: 3600, rent: 900, color: 'bg-yellow-500', group: 'เหลือง', gridPos: 'row-start-8 col-start-11' },
-  { id: 28, name: 'การไฟฟ้า', type: 'utility', price: 1500, rent: 300, color: 'bg-amber-600', icon: Zap, gridPos: 'row-start-9 col-start-11' },
-  { id: 29, name: 'หาดใหญ่', type: 'property', price: 3800, rent: 950, color: 'bg-yellow-500', group: 'เหลือง', gridPos: 'row-start-10 col-start-11' },
-  { id: 30, name: 'ไปเรือนจำ!', type: 'gotojail', price: 0, rent: 0, color: 'bg-rose-700', icon: ShieldAlert, gridPos: 'row-start-11 col-start-11' },
+  // ด้านขวา บนลงล่าง (แถว 2 -> 9, คอลัมน์ 9)
+  { id: 17, name: 'กระบี่', type: 'property', price: 2800, rent: 700, color: 'bg-red-500', group: 'แดง', gridPos: 'row-start-2 col-start-9' },
+  { id: 18, name: 'การ์ดโอกาส', type: 'chance', price: 0, rent: 0, color: 'bg-orange-500', icon: HelpCircle, gridPos: 'row-start-3 col-start-9' },
+  { id: 19, name: 'ภูเก็ต', type: 'property', price: 3200, rent: 800, color: 'bg-red-500', group: 'แดง', gridPos: 'row-start-4 col-start-9' },
+  { id: 20, name: 'สนามบินสุวรรณภูมิ', type: 'transport', price: 2000, rent: 400, color: 'bg-slate-700', icon: Plane, gridPos: 'row-start-5 col-start-9' },
+  { id: 21, name: 'สุราษฎร์ธานี', type: 'property', price: 3400, rent: 850, color: 'bg-yellow-500', group: 'เหลือง', gridPos: 'row-start-6 col-start-9' },
+  { id: 22, name: 'การไฟฟ้า', type: 'utility', price: 1500, rent: 300, color: 'bg-amber-600', icon: Zap, gridPos: 'row-start-7 col-start-9' },
+  { id: 23, name: 'หาดใหญ่', type: 'property', price: 3800, rent: 950, color: 'bg-yellow-500', group: 'เหลือง', gridPos: 'row-start-8 col-start-9' },
+  { id: 24, name: 'ไปเรือนจำ!', type: 'gotojail', price: 0, rent: 0, color: 'bg-rose-700', icon: ShieldAlert, gridPos: 'row-start-9 col-start-9' },
 
-  // ด้านล่าง ขวาไปซ้าย (แถว 11, คอลัมน์ 10 -> 2)
-  { id: 31, name: 'นนทบุรี', type: 'property', price: 4000, rent: 1000, color: 'bg-emerald-600', group: 'เขียว', gridPos: 'row-start-11 col-start-10' },
-  { id: 32, name: 'ปทุมธานี', type: 'property', price: 4200, rent: 1050, color: 'bg-emerald-600', group: 'เขียว', gridPos: 'row-start-11 col-start-9' },
-  { id: 33, name: 'หีบสมบัติ', type: 'chance', price: 0, rent: 0, color: 'bg-purple-500', icon: Gift, gridPos: 'row-start-11 col-start-8' },
-  { id: 34, name: 'สมุทรปราการ', type: 'property', price: 4400, rent: 1100, color: 'bg-emerald-600', group: 'เขียว', gridPos: 'row-start-11 col-start-7' },
-  { id: 35, name: 'ท่าเรือคลองเตย', type: 'transport', price: 2000, rent: 400, color: 'bg-slate-700', icon: Ship, gridPos: 'row-start-11 col-start-6' },
-  { id: 36, name: 'การ์ดโอกาส', type: 'chance', price: 0, rent: 0, color: 'bg-orange-500', icon: HelpCircle, gridPos: 'row-start-11 col-start-5' },
-  { id: 37, name: 'สาทร', type: 'property', price: 4800, rent: 1200, color: 'bg-blue-700', group: 'น้ำเงินเข้ม', gridPos: 'row-start-11 col-start-4' },
-  { id: 38, name: 'ภาษีฟุ่มเฟือย', type: 'tax', price: 1000, rent: 0, color: 'bg-rose-600', icon: ReceiptText, gridPos: 'row-start-11 col-start-3' },
-  { id: 39, name: 'สยามพารากอน', type: 'property', price: 5500, rent: 1500, color: 'bg-blue-700', group: 'น้ำเงินเข้ม', gridPos: 'row-start-11 col-start-2' },
+  // ด้านล่าง ขวาไปซ้าย (แถว 9, คอลัมน์ 8 -> 2)
+  { id: 25, name: 'นนทบุรี', type: 'property', price: 4000, rent: 1000, color: 'bg-emerald-600', group: 'เขียว', gridPos: 'row-start-9 col-start-8' },
+  { id: 26, name: 'ปทุมธานี', type: 'property', price: 4200, rent: 1050, color: 'bg-emerald-600', group: 'เขียว', gridPos: 'row-start-9 col-start-7' },
+  { id: 27, name: 'หีบสมบัติ', type: 'chance', price: 0, rent: 0, color: 'bg-purple-500', icon: Gift, gridPos: 'row-start-9 col-start-6' },
+  { id: 28, name: 'สมุทรปราการ', type: 'property', price: 4400, rent: 1100, color: 'bg-emerald-600', group: 'เขียว', gridPos: 'row-start-9 col-start-5' },
+  { id: 29, name: 'ท่าเรือคลองเตย', type: 'transport', price: 2000, rent: 400, color: 'bg-slate-700', icon: Ship, gridPos: 'row-start-9 col-start-4' },
+  { id: 30, name: 'ภาษีรายได้', type: 'tax', price: 800, rent: 0, color: 'bg-rose-600', icon: ReceiptText, gridPos: 'row-start-9 col-start-3' },
+  { id: 31, name: 'สยามพารากอน', type: 'property', price: 5500, rent: 1500, color: 'bg-blue-700', group: 'น้ำเงินเข้ม', gridPos: 'row-start-9 col-start-2' },
 ]
 
 // ข้อมูลประเภทธนบัตร 4 มูลค่า (1000, 500, 100, 20)
@@ -307,7 +362,122 @@ const CHANCE_CARDS = [
   },
 ]
 
-// คอมโพเนนต์แสดงแผงคลังธนบัตรและโฉนดที่ดิน (ใช้สำหรับทั้งผู้เล่นและบอท AI)
+// Modal คลังธนบัตรแบบเต็มจอ (Banknote Vault Modal)
+function BanknoteVaultModal({ ownerType, data, onClose }) {
+  if (!ownerType || !data) return null
+  const isPlayer = ownerType === 'player'
+  const cashBreakdown = breakdownCash(data.money)
+  const totalBills =
+    cashBreakdown[1000] + cashBreakdown[500] + cashBreakdown[100] + cashBreakdown[20]
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-900 border-2 border-amber-400 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl text-white relative animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+            <Banknote className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-white flex items-center gap-2">
+              <span>คลังธนบัตร{isPlayer ? 'ของคุณ' : 'ของบอท AI'}</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isPlayer ? 'bg-red-500/30 text-red-300 border border-red-500/50' : 'bg-cyan-500/30 text-cyan-300 border border-cyan-500/50'}`}>
+                {isPlayer ? '🔴 ผู้เล่น P1' : '🤖 บอท AI'}
+              </span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              ยอดเงินรวม: <b className="text-amber-300 font-mono text-sm">฿{data.money.toLocaleString()}</b> (รวม {totalBills} ใบ)
+            </p>
+          </div>
+        </div>
+
+        {/* รายการธนบัตรทั้ง 5 กอง */}
+        <div className="space-y-2 mb-4">
+          {DENOMINATIONS.map((denom) => {
+            const count = cashBreakdown[denom.value] || 0
+            const subtotal = count * denom.value
+            return (
+              <div
+                key={denom.id}
+                className={`w-full bg-gradient-to-r ${denom.bgGradient} rounded-xl px-3 py-2 border ${denom.borderColor} shadow-md text-white flex items-center justify-between select-none relative overflow-hidden`}
+              >
+                <div
+                  className={`absolute top-0 right-14 w-2.5 h-full bg-gradient-to-r from-transparent ${denom.foilColor} to-transparent skew-x-12 pointer-events-none opacity-40`}
+                />
+                <div className="flex items-center gap-2.5 z-10">
+                  <span
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs border ${denom.badgeBg} shadow-inner shrink-0`}
+                  >
+                    {denom.thaiNum}
+                  </span>
+                  <div className="text-left leading-tight">
+                    <span className={`text-sm font-mono font-black ${denom.accentText}`}>
+                      ฿{denom.value.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-white/70 block">
+                      ({denom.thaiWord})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 z-10 text-right">
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${denom.badgeBg}`}>
+                    {count} ใบ
+                  </span>
+                  <span className="text-sm font-mono font-bold text-white min-w-[70px]">
+                    ฿{subtotal.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* เหรียญกษาปณ์ */}
+          <div className="w-full bg-gradient-to-r from-amber-800 via-yellow-800 to-amber-900 rounded-xl px-3 py-2 border border-yellow-400/80 shadow-md text-white flex items-center justify-between select-none relative overflow-hidden">
+            <div className="flex items-center gap-2.5 z-10">
+              <div className="w-8 h-8 rounded-full border border-yellow-300/80 bg-gradient-to-br from-yellow-300 to-amber-500 text-slate-950 font-black text-xs flex items-center justify-center shadow-inner shrink-0">
+                ฿
+              </div>
+              <div className="text-left leading-tight">
+                <span className="text-sm font-bold text-yellow-200">เหรียญกษาปณ์</span>
+                <span className="text-[10px] text-yellow-300/70 block">เศษเงินทอน</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 z-10 text-right">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-black border bg-yellow-400/20 text-yellow-200 border-yellow-400/40">
+                เศษเหรียญ
+              </span>
+              <span className="text-sm font-mono font-bold text-yellow-100 min-w-[70px]">
+                ฿{cashBreakdown.coins}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-600 transition cursor-pointer"
+        >
+          ปิดหน้าต่างคลังธนบัตร
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// แผงสถานะผู้เล่น Gamer Profile HUD (สไตล์ LINE เกมเศรษฐี)
 function AssetsPanel({
   ownerType,
   data,
@@ -318,163 +488,150 @@ function AssetsPanel({
   hoveredTileId,
   setHoveredTileId,
   className = '',
+  turn,
+  onOpenVault,
 }) {
   const isPlayer = ownerType === 'player'
+  const isCurrentTurn = turn === ownerType
   const cashBreakdown = breakdownCash(data.money)
+  const totalBills =
+    cashBreakdown[1000] + cashBreakdown[500] + cashBreakdown[100] + cashBreakdown[20]
   const ownedTiles = INITIAL_TILES.filter((tile) => data.owned.includes(tile.id))
 
   return (
     <div
-      className={`w-full lg:w-72 xl:w-80 shrink-0 bg-white rounded-2xl border border-gray-200 shadow-xs p-3 sm:p-3.5 flex flex-col gap-2.5 h-full max-h-[calc(100vh-150px)] overflow-hidden ${className}`}
+      className={`w-full lg:w-64 xl:w-72 shrink-0 bg-slate-900/90 backdrop-blur-md rounded-2xl border transition-all duration-300 p-3 flex flex-col gap-2.5 h-full max-h-[calc(100vh-140px)] overflow-hidden shadow-2xl ${
+        isCurrentTurn
+          ? isPlayer
+            ? 'border-red-500/80 ring-2 ring-red-400/50 shadow-red-500/20'
+            : 'border-cyan-500/80 ring-2 ring-cyan-400/50 shadow-cyan-500/20'
+          : 'border-slate-800/80'
+      } ${className}`}
     >
-      {/* ส่วนหัวการเงิน & โฉนด */}
-      <div className="flex items-center justify-between border-b border-gray-100 pb-2 shrink-0">
-        <div className="flex items-center gap-1.5 text-xs font-black text-gray-800">
-          <div
-            className={`w-5 h-5 rounded-md flex items-center justify-center ${
-              isPlayer ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
-            }`}
-          >
-            {isPlayer ? (
-              <UserRound className="w-3.5 h-3.5 stroke-[2.5]" />
-            ) : (
-              <Bot className="w-3.5 h-3.5 stroke-[2.5]" />
-            )}
+      {/* 1. GAMER PROFILE HEADER CARD (สไตล์ LINE เกมเศรษฐี) */}
+      <div
+        className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
+          isPlayer
+            ? 'bg-gradient-to-r from-red-950/80 via-slate-900 to-red-900/40 border-red-500/40'
+            : 'bg-gradient-to-r from-cyan-950/80 via-slate-900 to-blue-900/40 border-cyan-500/40'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          {/* Avatar Ring with Team Badge */}
+          <div className="relative">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-lg border ${
+                isPlayer
+                  ? 'bg-gradient-to-br from-red-500 to-rose-700 text-white border-red-300 shadow-red-500/40'
+                  : 'bg-gradient-to-br from-cyan-500 to-blue-700 text-white border-cyan-300 shadow-cyan-500/40'
+              }`}
+            >
+              {isPlayer ? <UserRound className="w-5 h-5 stroke-[2.5]" /> : <Bot className="w-5 h-5 stroke-[2.5]" />}
+            </div>
+            <span
+              className={`absolute -bottom-1 -right-1 px-1 py-0.2 rounded-full text-[8px] font-black leading-none border ${
+                isPlayer
+                  ? 'bg-amber-400 text-slate-950 border-white'
+                  : 'bg-cyan-400 text-slate-950 border-white'
+              }`}
+            >
+              {isPlayer ? '1P' : 'AI'}
+            </span>
           </div>
-          <span>{isPlayer ? 'เงิน & โฉนดของคุณ' : 'เงิน & โฉนดของบอท AI'}</span>
+
+          <div className="leading-tight">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-black text-white">
+                {isPlayer ? 'คุณ (Player)' : 'บอท AI'}
+              </span>
+              {isCurrentTurn && (
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isPlayer ? 'bg-red-400' : 'bg-cyan-400'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isPlayer ? 'bg-red-500' : 'bg-cyan-500'}`}></span>
+                </span>
+              )}
+            </div>
+            <span className={`text-[10px] font-bold ${isCurrentTurn ? (isPlayer ? 'text-red-400 animate-pulse' : 'text-cyan-400 animate-pulse') : 'text-slate-400'}`}>
+              {isCurrentTurn ? (isPlayer ? '🎮 กำลังเล่น...' : '🤖 กำลังคำนวณ...') : '⏳ รอตาเดิน'}
+            </span>
+          </div>
         </div>
 
-        <span
-          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-            isPlayer
-              ? 'bg-red-50 text-red-700 border-red-200'
-              : 'bg-blue-50 text-blue-700 border-blue-200'
-          }`}
-        >
-          {isPlayer ? '🔴 คุณ' : '🤖 บอท'}
-        </span>
+        {/* Badge เมือง */}
+        <div className="text-right">
+          <span className="text-[10px] text-slate-400 block font-semibold">เมือง</span>
+          <span className="text-xs font-black text-amber-300 font-mono">
+            {ownedTiles.length} <span className="text-[9px] text-slate-500">/40</span>
+          </span>
+        </div>
       </div>
 
-      {/* 1. กล่องคลังธนบัตร (Banknotes Stack) */}
-      <div className="shrink-0 flex flex-col gap-1.5">
-        <div className="flex items-center justify-between text-[11px] font-bold">
-          <span className="flex items-center gap-1.5 text-gray-800 font-black">
-            <Banknote className="w-3.5 h-3.5 text-emerald-600" />
-            <span>คลังธนบัตร</span>
+      {/* 2. ยอดเงินและคลังธนบัตร (เน้นตัวเลขทองขนาดใหญ่ สไตล์เกมเศรษฐี) */}
+      <div className="bg-slate-950/80 rounded-xl p-2.5 border border-amber-500/30 flex flex-col gap-1.5 shadow-inner">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1">
+            <Coins className="w-3 h-3 text-amber-400" />
+            <span>ยอดเงินสดในมือ</span>
           </span>
-          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-mono">
+          <span className="text-[9px] text-slate-400 font-mono">
+            {totalBills} ใบ {cashBreakdown.coins > 0 && `(+฿${cashBreakdown.coins})`}
+          </span>
+        </div>
+
+        {/* ยอดเงินใหญ่สะใจ สีทองนีออน */}
+        <div className="flex items-baseline justify-between">
+          <span className="text-xl sm:text-2xl font-black font-mono text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 drop-shadow-sm">
             ฿{data.money.toLocaleString()}
           </span>
+
+          <button
+            onClick={onOpenVault}
+            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition active:scale-95 cursor-pointer flex items-center gap-1"
+            title="เปิดดูการแจกแจงธนบัตรทั้งหมด (1000, 500, 100, 20, เหรียญ)"
+          >
+            <Banknote className="w-3 h-3" />
+            <span>คลังธนบัตร</span>
+          </button>
         </div>
 
-        {/* รายการธนบัตรเรียงลงมาตามลำดับ (1000 -> 500 -> 100 -> 20 -> เหรียญ) */}
-        <div className="flex flex-col gap-1 w-full">
-          {DENOMINATIONS.map((denom) => {
-            const count = cashBreakdown[denom.value] || 0
-            const subtotal = count * denom.value
-
-            return (
-              <div
-                key={denom.id}
-                className={`w-full bg-gradient-to-r ${denom.bgGradient} rounded-lg px-2.5 py-1.5 border ${denom.borderColor} shadow-2xs text-white flex items-center justify-between transition-all duration-150 hover:scale-[1.015] hover:shadow-xs select-none relative overflow-hidden`}
-              >
-                {/* แถบเงาโฮโลแกรม */}
-                <div
-                  className={`absolute top-0 right-14 w-2.5 h-full bg-gradient-to-r from-transparent ${denom.foilColor} to-transparent skew-x-12 pointer-events-none opacity-30`}
-                />
-
-                {/* ฝั่งซ้าย: เลขไทย + มูลค่าแบงก์ */}
-                <div className="flex items-center gap-2 z-10">
-                  <span
-                    className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] border ${denom.badgeBg} shadow-inner shrink-0`}
-                  >
-                    {denom.thaiNum}
-                  </span>
-                  <div className="text-left leading-tight">
-                    <div className="flex items-center gap-1">
-                      <span className={`text-xs font-mono font-black ${denom.accentText}`}>
-                        ฿{denom.value.toLocaleString()}
-                      </span>
-                      <span className="text-[9px] text-white/70">
-                        ({denom.thaiWord})
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ฝั่งขวา: จำนวนใบ + ยอดรวม */}
-                <div className="flex items-center gap-2 z-10 text-right">
-                  <span
-                    className={`px-1.5 py-0.2 rounded-md text-[9px] font-black border ${denom.badgeBg}`}
-                  >
-                    {count} ใบ
-                  </span>
-                  <span className="text-xs font-mono font-bold text-white min-w-[55px]">
-                    ฿{subtotal.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-
-          {/* แถวเหรียญกษาปณ์ */}
-          <div className="w-full bg-gradient-to-r from-amber-800 via-yellow-800 to-amber-900 rounded-lg px-2.5 py-1.5 border border-yellow-400/80 shadow-2xs text-white flex items-center justify-between transition-all duration-150 hover:scale-[1.015] hover:shadow-xs select-none relative overflow-hidden">
-            <div className="flex items-center gap-2 z-10">
-              <div className="w-6 h-6 rounded-full border border-yellow-300/80 bg-gradient-to-br from-yellow-300 to-amber-500 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-inner shrink-0">
-                ฿
-              </div>
-              <div className="text-left leading-tight">
-                <span className="text-xs font-bold text-yellow-200">
-                  เหรียญกษาปณ์
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 z-10 text-right">
-              <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black border bg-yellow-400/20 text-yellow-200 border-yellow-400/40">
-                เศษเหรียญ
-              </span>
-              <span className="text-xs font-mono font-bold text-yellow-100 min-w-[55px]">
-                ฿{cashBreakdown.coins}
-              </span>
-            </div>
+        {/* แถบสรุปจำนวนธนบัตรย่อย (Mini Chips) สะอาด ไม่รกตา */}
+        <div className="grid grid-cols-4 gap-1 pt-1 border-t border-white/5 text-center">
+          <div className="bg-amber-950/40 rounded px-1 py-0.5 border border-amber-700/30">
+            <span className="text-[8px] text-amber-400 block font-bold leading-none">1,000</span>
+            <span className="text-[9px] font-black text-white font-mono leading-none">{cashBreakdown[1000]}</span>
           </div>
-        </div>
-
-        {/* แถบสรุปจำนวนธนบัตรทั้งหมด */}
-        <div className="bg-amber-50/80 rounded-lg px-2.5 py-1 border border-amber-200/90 text-[10px] flex items-center justify-between font-bold text-amber-950">
-          <span className="flex items-center gap-1">
-            <Layers className="w-3 h-3 text-amber-700" />
-            <span>ธนบัตรทั้งหมด:</span>
-          </span>
-          <span className="font-black text-amber-800 font-mono">
-            {cashBreakdown[1000] + cashBreakdown[500] + cashBreakdown[100] + cashBreakdown[20]} ใบ (+ ฿{cashBreakdown.coins})
-          </span>
+          <div className="bg-purple-950/40 rounded px-1 py-0.5 border border-purple-700/30">
+            <span className="text-[8px] text-purple-300 block font-bold leading-none">500</span>
+            <span className="text-[9px] font-black text-white font-mono leading-none">{cashBreakdown[500]}</span>
+          </div>
+          <div className="bg-rose-950/40 rounded px-1 py-0.5 border border-rose-700/30">
+            <span className="text-[8px] text-rose-300 block font-bold leading-none">100</span>
+            <span className="text-[9px] font-black text-white font-mono leading-none">{cashBreakdown[100]}</span>
+          </div>
+          <div className="bg-emerald-950/40 rounded px-1 py-0.5 border border-emerald-700/30">
+            <span className="text-[8px] text-emerald-300 block font-bold leading-none">20</span>
+            <span className="text-[9px] font-black text-white font-mono leading-none">{cashBreakdown[20]}</span>
+          </div>
         </div>
       </div>
 
-      {/* 2. รายการโฉนดที่ดินในครอบครอง (พร้อมเอฟเฟกต์เมาส์ชี้แล้วเด้งดึ๋ง) */}
-      <div className="flex-1 flex flex-col min-h-0 pt-1 border-t border-gray-100">
+      {/* 3. รายการโฉนดที่ดินในครอบครอง (Compact Gamer Cards) */}
+      <div className="flex-1 flex flex-col min-h-0 pt-1">
         <div className="flex items-center justify-between mb-1.5 shrink-0">
-          <span className="text-xs font-black text-gray-800 flex items-center gap-1">
-            <Building2 className={`w-3.5 h-3.5 ${isPlayer ? 'text-amber-600' : 'text-blue-600'}`} />
-            <span>โฉนดที่ดิน ({ownedTiles.length} แปลง)</span>
+          <span className="text-xs font-black text-slate-200 flex items-center gap-1">
+            <Building2 className={`w-3.5 h-3.5 ${isPlayer ? 'text-amber-400' : 'text-cyan-400'}`} />
+            <span>โฉนดที่ดิน ({ownedTiles.length})</span>
           </span>
-          <span className="text-[10px] text-gray-400">
-            ชี้เมาส์เพื่อดู
-          </span>
+          <span className="text-[9px] text-slate-400">ชี้เพื่อดูตำแหน่ง</span>
         </div>
 
-        {/* รายการโฉนด เลื่อนขึ้นลงได้ */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300">
+        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 min-h-0 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20">
           {ownedTiles.length === 0 ? (
-            <div className="py-6 text-center text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-              <Building2 className="w-6 h-6 mx-auto mb-1 text-gray-300" />
-              <p className="text-xs font-bold text-gray-500">ยังไม่มีโฉนดที่ดิน</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {isPlayer
-                  ? 'เดินตกที่ดินว่างแล้วกดซื้อเพื่อเริ่มสะสม!'
-                  : 'บอทยังไม่ได้ครอบครองที่ดินแปลงใด'}
+            <div className="py-6 text-center text-slate-500 bg-slate-950/50 rounded-xl border border-dashed border-slate-800">
+              <Building2 className="w-5 h-5 mx-auto mb-1 text-slate-600" />
+              <p className="text-xs font-bold text-slate-400">ยังไม่มีที่ดิน</p>
+              <p className="text-[9.5px] text-slate-500 mt-0.5">
+                {isPlayer ? 'ทอยเต๋าตกช่องว่างเพื่อซื้อ!' : 'บอทยังไม่ได้ซื้อที่ดิน'}
               </p>
             </div>
           ) : (
@@ -483,58 +640,48 @@ function AssetsPanel({
                 key={tile.id}
                 onMouseEnter={() => setHoveredTileId(tile.id)}
                 onMouseLeave={() => setHoveredTileId(null)}
-                className={`bg-white rounded-xl border-2 shadow-2xs hover:shadow-xl p-2.5 transition-all duration-200 transform hover:-translate-y-2 hover:scale-[1.03] hover:z-20 cursor-pointer relative overflow-hidden group ${
+                className={`bg-slate-950/90 rounded-xl border p-2 transition-all duration-200 transform hover:scale-[1.02] cursor-pointer relative overflow-hidden select-none ${
                   isPlayer
-                    ? 'border-gray-200 hover:border-amber-400 hover:ring-2 hover:ring-amber-300/40'
-                    : 'border-gray-200 hover:border-blue-400 hover:ring-2 hover:ring-blue-300/40'
+                    ? 'border-red-500/40 hover:border-amber-400 hover:ring-1 hover:ring-amber-400/50'
+                    : 'border-cyan-500/40 hover:border-cyan-300 hover:ring-1 hover:ring-cyan-400/50'
                 }`}
               >
                 {/* แถบสีหัวโฉนด */}
-                <div
-                  className={`h-2.5 w-full rounded-md ${tile.color} mb-2 px-1.5 flex items-center justify-between`}
-                >
-                  <span className="text-[7.5px] font-black text-white uppercase tracking-wider">
-                    โฉนดที่ดิน
-                  </span>
-                  <span className="text-[7.5px] text-white font-bold">
-                    {(propertyLevels[tile.id] || 1) === 1
-                      ? 'ขั้น 1 (ที่ดิน)'
-                      : (propertyLevels[tile.id] || 1) === 2
-                      ? '⭐⭐ ขั้น 2 (บ้าน)'
-                      : '⭐⭐⭐ ขั้น 3 (ตึกสูงสุด)'}
-                  </span>
-                </div>
+                <div className={`h-1.5 w-full rounded-full ${tile.color} mb-1.5`} />
 
                 <div className="flex items-center justify-between">
-                  <span className="font-black text-xs text-gray-800 group-hover:text-amber-800 transition-colors">
+                  <span className="font-bold text-xs text-white truncate max-w-[120px]">
                     {tile.name}
                   </span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 font-mono">
+                  <span className="text-[10px] font-black text-amber-300 font-mono">
                     ฿{tile.price.toLocaleString()}
                   </span>
                 </div>
 
-                <div className="mt-1.5 pt-1 border-t border-gray-100 flex items-center justify-between text-[10px]">
-                  <span className="text-gray-500">
-                    ระดับ: <b className="text-amber-700">ขั้น {propertyLevels[tile.id] || 1}/3</b>
+                <div className="mt-1 pt-1 border-t border-white/5 flex items-center justify-between text-[10px]">
+                  <span className="text-slate-400 flex items-center gap-0.5">
+                    {(propertyLevels[tile.id] || 1) === 1
+                      ? '⭐ ขั้น 1'
+                      : (propertyLevels[tile.id] || 1) === 2
+                      ? '⭐⭐ ขั้น 2'
+                      : '🏰 ขั้น 3'}
                   </span>
-                  <span className="font-black text-rose-600 font-mono">
+                  <span className="font-bold text-rose-400 font-mono">
                     ค่าเช่า ฿{getTileRent(tile.id).toLocaleString()}
                   </span>
                 </div>
 
-                {/* ปุ่มขายที่ดินทิ้ง (เฉพาะฝั่งผู้เล่น) ที่ดินจะกลับมาว่างเปล่า */}
                 {isPlayer && onSellProperty && getTileSellPrice && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       onSellProperty(tile.id)
                     }}
-                    className="mt-1.5 w-full py-1 text-[9.5px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 active:scale-95 border border-rose-200 rounded-md transition flex items-center justify-center gap-1 cursor-pointer"
-                    title="ขายที่ดินคืนธนาคาร (ช่องนี้จะกลับมาว่างเปล่าบนกระดาน)"
+                    className="mt-1.5 w-full py-0.5 text-[9px] font-bold text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-600/40 border border-rose-500/30 rounded-md transition flex items-center justify-center gap-1 cursor-pointer"
+                    title="ขายคืนธนาคาร"
                   >
-                    <Trash2 className="w-3 h-3 text-rose-600" />
-                    <span>ขายที่ดินทิ้ง (รับ ฿{getTileSellPrice(tile.id).toLocaleString()})</span>
+                    <Trash2 className="w-2.5 h-2.5" />
+                    <span>ขายคืน (รับ ฿{getTileSellPrice(tile.id).toLocaleString()})</span>
                   </button>
                 )}
               </div>
@@ -607,6 +754,12 @@ function Game({ setCurrentPage }) {
 
   // ช่องที่ดินที่ผู้เล่นกดคลิกเพื่อดูรายละเอียดและค่าเช่า
   const [inspectingTile, setInspectingTile] = useState(null)
+
+  // เปิด/ปิด เสียงในเกม
+  const [soundEnabled, setSoundEnabled] = useState(true)
+
+  // เปิดดูคลังธนบัตรแบบเต็ม ('player' | 'bot' | null)
+  const [activeVaultModal, setActiveVaultModal] = useState(null)
 
   // References เพื่อป้องกันปัญหา Stale Closures และการค้างในตาบอท
   const playerRef = useRef(player)
@@ -1045,6 +1198,7 @@ function Game({ setCurrentPage }) {
           let newMoney = prev.money
           if (currentPos === 0) {
             newMoney += 2000
+            playSound('coin', soundEnabled)
             addLog('🚩 คุณเดินผ่านจุดเริ่มต้น รับโบนัส ฿2,000!')
           }
           return { ...prev, pos: currentPos, money: newMoney }
@@ -1054,6 +1208,7 @@ function Game({ setCurrentPage }) {
           let newMoney = prev.money
           if (currentPos === 0) {
             newMoney += 2000
+            playSound('coin', soundEnabled)
             addLog('🚩 บอทเดินผ่านจุดเริ่มต้น รับโบนัส ฿2,000!')
           }
           return { ...prev, pos: currentPos, money: newMoney }
@@ -1087,6 +1242,7 @@ function Game({ setCurrentPage }) {
           return
         }
         setPlayer((p) => ({ ...p, money: p.money - tile.price }))
+        playSound('warn', soundEnabled)
         addLog(`💸 คุณเสียภาษี ฿${tile.price.toLocaleString()}`)
         endPlayerTurnOrDouble(doubleFlag, 1000)
       } else {
@@ -1104,15 +1260,16 @@ function Game({ setCurrentPage }) {
 
     if (tile.type === 'gotojail') {
       addLog(`🚨 ${isPlayer ? 'คุณ' : 'บอท'} โดนตำรวจจับส่งเข้าเรือนจำ!`)
+      const jailTileId = INITIAL_TILES.find((t) => t.type === 'jail')?.id ?? 8
       if (isPlayer) {
         setIsDoubleRoll(false)
         setTimeout(() => {
-          setPlayer((p) => ({ ...p, pos: 10 }))
+          setPlayer((p) => ({ ...p, pos: jailTileId }))
           setTurn('bot')
         }, 800)
       } else {
         setTimeout(() => {
-          setBot((b) => ({ ...b, pos: 10 }))
+          setBot((b) => ({ ...b, pos: jailTileId }))
           setTurn('player')
           setHasRolled(false)
         }, 800)
@@ -1322,6 +1479,7 @@ function Game({ setCurrentPage }) {
       owned: [...p.owned, tile.id],
     }))
     setPropertyLevels((prev) => ({ ...prev, [tile.id]: 1 }))
+    playSound('buy', soundEnabled)
     addLog(`🎉 คุณได้ซื้อที่ดิน "${tile.name}" ราคา ฿${tile.price.toLocaleString()} (ขั้น 1)`)
     endPlayerTurnOrDouble(isDoubleRoll, 1000)
   }
@@ -1350,6 +1508,7 @@ function Game({ setCurrentPage }) {
       [tile.id]: nextLvl,
     }))
     const newRent = getTileRent(tile.id, nextLvl)
+    playSound('buy', soundEnabled)
     addLog(`🏗️ คุณอัปเกรด "${tile.name}" เป็นขั้น ${nextLvl}! ค่าเช่าใหม่คือ ฿${newRent.toLocaleString()}`)
     setCanUpgradeTile(null)
     endPlayerTurnOrDouble(isDoubleRoll, 1000)
@@ -1410,38 +1569,43 @@ function Game({ setCurrentPage }) {
   if (gamePhase === 'welcome') {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-140px)] p-4 select-none">
-        <div className="bg-white rounded-3xl max-w-lg w-full p-8 text-center shadow-xl border border-gray-200 animate-in fade-in zoom-in-95 duration-200">
-          {/* ไอคอนหัวข้อ */}
-          <div className="w-20 h-20 bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 rounded-3xl flex items-center justify-center text-white mx-auto shadow-lg shadow-amber-500/30 mb-5">
+        <div className="bg-gradient-to-br from-slate-900 via-[#0B1528] to-slate-950 rounded-3xl max-w-lg w-full p-8 text-center shadow-2xl border-2 border-amber-400 text-white animate-in fade-in zoom-in-95 duration-200 relative overflow-hidden">
+          {/* แสงเอฟเฟกต์พื้นหลัง */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* ไอคอนหัวข้อ 3D */}
+          <div className="relative w-20 h-20 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 rounded-3xl flex items-center justify-center text-slate-950 mx-auto shadow-xl shadow-amber-500/40 mb-5 border-2 border-yellow-200">
             <Gamepad2 className="w-10 h-10" />
+            <Sparkles className="w-5 h-5 absolute -top-1 -right-1 text-white animate-spin" />
           </div>
 
-          <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-full mb-2">
-            PROJECT-T MONOPOLY
+          <span className="inline-block px-3.5 py-1 bg-amber-400/20 text-amber-300 border border-amber-400/40 text-xs font-black rounded-full mb-2 tracking-wider">
+            ⭐ MONOPOLY ARENA (LINE STYLE) ⭐
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-800 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-100 to-amber-400 mb-2">
             คุณต้องการเล่นเกมเศรษฐีหรือไม่?
           </h1>
-          <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
-            เข้าสู่เกมกระดาน 11 × 11 (40 ช่อง) พร้อมคลังธนบัตร โฉนดที่ดิน และดวลสร้างเมืองกับบอท AI!
+          <p className="text-slate-300 text-sm mb-6 max-w-sm mx-auto leading-relaxed">
+            กระดานเกมเศรษฐี 9 × 9 (32 ช่อง) พร้อมคลังธนบัตร โฉนดที่ดิน และดวลสร้างเมืองแลนด์มาร์กกับบอท AI!
           </p>
 
           {/* จุดเด่นของเกม 3 ข้อ */}
           <div className="grid grid-cols-3 gap-2.5 mb-8 text-left">
-            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100">
+            <div className="p-3 bg-slate-950/70 rounded-2xl border border-amber-500/30">
               <span className="text-2xl block mb-1">✊</span>
-              <p className="font-bold text-xs text-amber-900">เป่ายิ้งฉุบ</p>
-              <p className="text-[10px] text-amber-700">ชิงสิทธิ์เริ่มก่อน</p>
+              <p className="font-bold text-xs text-amber-300">เป่ายิ้งฉุบ</p>
+              <p className="text-[10px] text-slate-400">ชิงสิทธิ์เริ่มก่อน</p>
             </div>
-            <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100">
+            <div className="p-3 bg-slate-950/70 rounded-2xl border border-cyan-500/30">
               <span className="text-2xl block mb-1">🤖</span>
-              <p className="font-bold text-xs text-blue-900">ดวลกับบอท</p>
-              <p className="text-[10px] text-blue-700">ระบบ AI ทอยเต๋า</p>
+              <p className="font-bold text-xs text-cyan-300">ดวลกับบอท</p>
+              <p className="text-[10px] text-slate-400">ระบบ AI ทอยเต๋า</p>
             </div>
-            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+            <div className="p-3 bg-slate-950/70 rounded-2xl border border-emerald-500/30">
               <span className="text-2xl block mb-1">🏙️</span>
-              <p className="font-bold text-xs text-emerald-900">โฉนด & ธนบัตร</p>
-              <p className="text-[10px] text-emerald-700">สะสมที่ดินเก็บค่าเช่า</p>
+              <p className="font-bold text-xs text-emerald-300">แลนด์มาร์ก</p>
+              <p className="text-[10px] text-slate-400">สะสมเมืองเก็บค่าเช่า</p>
             </div>
           </div>
 
@@ -1450,25 +1614,28 @@ function Game({ setCurrentPage }) {
             {setCurrentPage && (
               <button
                 onClick={() => setCurrentPage('home')}
-                className="w-full sm:w-auto px-5 py-3 rounded-xl border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer order-2 sm:order-1"
+                className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer order-2 sm:order-1"
               >
-                <Home className="w-4 h-4 text-gray-500" />
+                <Home className="w-4 h-4 text-slate-400" />
                 <span>กลับหน้าแรก</span>
               </button>
             )}
 
             <button
-              onClick={() => setGamePhase('rps')}
-              className="w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 transition transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-2"
+              onClick={() => {
+                playSound('coin', soundEnabled)
+                setGamePhase('rps')
+              }}
+              className="w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:to-yellow-500 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/30 transition transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-2 ring-2 ring-yellow-300"
             >
               <span>🎲 เริ่มเล่นเกมเศรษฐี!</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
-          {/* ทางเลือก: สลับไปเล่นเกมที่ 2 (เกมแวร์วูล์ฟ) */}
+          {/* ทางเลือก: สลับไปเล่นเกมแวร์วูล์ฟ */}
           {setCurrentPage && (
-            <div className="mt-6 pt-5 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950 p-4 rounded-2xl text-left">
+            <div className="mt-6 pt-5 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950/90 p-4 rounded-2xl text-left border border-indigo-500/20">
               <div>
                 <p className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
                   <span>🐺</span>
@@ -1492,22 +1659,24 @@ function Game({ setCurrentPage }) {
   }
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-85px)] justify-between select-none relative">
+    <div className="flex flex-col h-full max-h-[calc(100vh-80px)] justify-between select-none relative bg-gradient-to-b from-[#050C18] via-[#09152A] to-[#050C18] p-2 sm:p-2.5 rounded-2xl border border-indigo-500/20 shadow-2xl text-white">
       {/* ================= MODAL เป่ายิ้งฉุบก่อนเริ่มเกม ================= */}
       {gamePhase === 'rps' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border-4 border-amber-400 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-center gap-2 mb-2 text-amber-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-gradient-to-br from-slate-900 via-[#0D1B33] to-slate-950 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border-4 border-amber-400 text-white animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-center gap-2 mb-2 text-amber-400">
               <Swords className="w-8 h-8 animate-bounce" />
             </div>
-            <h2 className="text-2xl font-black text-gray-800">เป่ายิ้งฉุบเลือกคนเริ่มก่อน!</h2>
-            <p className="text-gray-500 text-xs sm:text-sm mt-1 mb-6">
+            <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">
+              เป่ายิ้งฉุบเลือกคนเริ่มก่อน!
+            </h2>
+            <p className="text-slate-300 text-xs sm:text-sm mt-1 mb-6">
               คุณ vs บอท AI ใครชนะจะได้ทอยลูกเต๋าเดินก่อน
             </p>
 
             {/* แสดงสิ่งที่บอทเลือก (ถ้ามีการเลือกแล้ว) */}
             {rpsResult.botChoice && (
-              <div className="mb-4 p-3 bg-amber-50 rounded-2xl border border-amber-200 text-sm font-semibold text-amber-900">
+              <div className="mb-4 p-3 bg-amber-500/10 rounded-2xl border border-amber-400/40 text-sm font-semibold text-amber-200">
                 {rpsResult.message}
               </div>
             )}
@@ -1517,53 +1686,57 @@ function Game({ setCurrentPage }) {
               {RPS_CHOICES.map((choice) => (
                 <button
                   key={choice.id}
-                  onClick={() => handleRPSPlay(choice.id)}
-                  className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-amber-100 hover:border-amber-400 border-2 border-gray-200 rounded-2xl transition transform hover:scale-105 active:scale-95 cursor-pointer shadow-xs group"
+                  onClick={() => {
+                    playSound('dice', soundEnabled)
+                    handleRPSPlay(choice.id)
+                  }}
+                  className="flex flex-col items-center justify-center p-4 bg-slate-950/80 hover:bg-amber-500/20 hover:border-amber-400 border-2 border-slate-700 rounded-2xl transition transform hover:scale-105 active:scale-95 cursor-pointer shadow-lg group"
                 >
                   <span className="text-4xl sm:text-5xl mb-2 group-hover:scale-110 transition-transform">
                     {choice.icon}
                   </span>
-                  <span className="text-xs sm:text-sm font-bold text-gray-700">
+                  <span className="text-xs sm:text-sm font-bold text-slate-200 group-hover:text-amber-300">
                     {choice.label}
                   </span>
                 </button>
               ))}
             </div>
 
-            <p className="text-[11px] text-gray-400">
+            <p className="text-[11px] text-slate-400">
               คลิกเลือกสัญลักษณ์ที่ต้องการ เพื่อเริ่มท้าดวลกับบอท
             </p>
           </div>
         </div>
       )}
 
-      {/* แถบหัวด้านบน: สรุปสถานะ 2 ฝั่ง (คุณ vs บอท) */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-200 shadow-2xs shrink-0 mb-2">
+      {/* แถบหัวด้านบน: สรุปสถานะ 2 ฝั่ง (คุณ vs บอท) สไตล์ GAMER HUD BAR */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/80 backdrop-blur-md px-3 sm:px-4 py-2 rounded-xl border border-white/10 shadow-lg shrink-0 mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-base sm:text-lg font-black text-gray-800 tracking-tight">
-            🎲 เกมเศรษฐี
+          <span className="text-base sm:text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200 tracking-tight flex items-center gap-1.5">
+            <Gamepad2 className="w-5 h-5 text-amber-400" />
+            <span>เกมเศรษฐี</span>
           </span>
-          <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 rounded-full">
-            11 × 11 vs บอท AI
+          <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full">
+            9 × 9 vs AI
           </span>
         </div>
 
-        {/* แถบสถานะ คุณ vs บอท (ขยายขนาดตัวอักษรและกล่องเงินให้เด่นชัดขึ้นตามคำขอ) */}
+        {/* แถบสถานะ คุณ vs บอท (สไตล์ Gamer Battle Header) */}
         <div className="flex items-center gap-2 sm:gap-4">
           {/* สถานะผู้เล่น */}
           <div
-            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-xl border transition-all ${
               turn === 'player'
-                ? 'bg-red-50 text-red-950 border-red-300 ring-2 ring-red-400/60 shadow-xs'
-                : 'bg-gray-50 text-gray-700 border-gray-200 opacity-80'
+                ? 'bg-red-950/60 text-white border-red-500/80 ring-2 ring-red-400/50 shadow-md shadow-red-500/20'
+                : 'bg-slate-900/60 text-slate-300 border-slate-700/60 opacity-80'
             }`}
           >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
-              <UserRound className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.5]" />
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-700 text-white flex items-center justify-center shrink-0 shadow-md">
+              <UserRound className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <div className="leading-tight">
+            <div className="leading-tight text-left">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-gray-600">คุณ</span>
+                <span className="text-xs font-bold text-slate-300">คุณ</span>
                 {turn === 'player' && (
                   <span className="text-[9px] px-1.5 py-0.2 bg-red-600 text-white font-black rounded-full animate-pulse">
                     ตาของคุณ
@@ -1571,43 +1744,43 @@ function Game({ setCurrentPage }) {
                 )}
               </div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-base sm:text-xl font-black font-mono text-red-600">
+                <span className="text-base sm:text-lg font-black font-mono text-amber-300 drop-shadow-xs">
                   ฿{player.money.toLocaleString()}
                 </span>
-                <span className="text-xs font-semibold text-gray-500">
+                <span className="text-[10px] font-semibold text-slate-400">
                   ({player.owned.length} เมือง)
                 </span>
               </div>
             </div>
           </div>
 
-          <span className="text-xs sm:text-sm font-black text-gray-400">VS</span>
+          <span className="text-xs sm:text-sm font-black text-amber-400/80">VS</span>
 
           {/* สถานะบอท */}
           <div
-            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border transition-all ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-xl border transition-all ${
               turn === 'bot'
-                ? 'bg-blue-50 text-blue-950 border-blue-300 ring-2 ring-blue-400/60 shadow-xs'
-                : 'bg-gray-50 text-gray-700 border-gray-200 opacity-80'
+                ? 'bg-cyan-950/60 text-white border-cyan-500/80 ring-2 ring-cyan-400/50 shadow-md shadow-cyan-500/20'
+                : 'bg-slate-900/60 text-slate-300 border-slate-700/60 opacity-80'
             }`}
           >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.5]" />
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-700 text-white flex items-center justify-center shrink-0 shadow-md">
+              <Bot className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <div className="leading-tight">
+            <div className="leading-tight text-left">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-gray-600">บอท AI</span>
+                <span className="text-xs font-bold text-slate-300">บอท AI</span>
                 {turn === 'bot' && (
-                  <span className="text-[9px] px-1.5 py-0.2 bg-blue-600 text-white font-black rounded-full animate-pulse">
+                  <span className="text-[9px] px-1.5 py-0.2 bg-cyan-600 text-slate-950 font-black rounded-full animate-pulse">
                     ตากำลังเดิน...
                   </span>
                 )}
               </div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-base sm:text-xl font-black font-mono text-blue-600">
+                <span className="text-base sm:text-lg font-black font-mono text-cyan-300 drop-shadow-xs">
                   ฿{bot.money.toLocaleString()}
                 </span>
-                <span className="text-xs font-semibold text-gray-500">
+                <span className="text-[10px] font-semibold text-slate-400">
                   ({bot.owned.length} เมือง)
                 </span>
               </div>
@@ -1615,25 +1788,35 @@ function Game({ setCurrentPage }) {
           </div>
         </div>
 
-        {/* ปุ่มเริ่มใหม่ */}
-        <button
-          onClick={handleReset}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition cursor-pointer"
-          title="เริ่มเกมใหม่ (กลับไปหน้าเริ่มต้น)"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>เริ่มใหม่</span>
-        </button>
+        {/* ปุ่มควบคุมด้านบน (เสียง + เริ่มใหม่) */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+            title={soundEnabled ? 'ปิดเสียง' : 'เปิดเสียง'}
+          >
+            {soundEnabled ? <Volume2 className="w-4 h-4 text-amber-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+          </button>
+
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 rounded-lg transition cursor-pointer active:scale-95"
+            title="เริ่มเกมใหม่ (กลับไปหน้าเริ่มต้น)"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+            <span>เริ่มใหม่</span>
+          </button>
+        </div>
       </div>
 
       {/* แถบสลับมุมมองสำหรับหน้าจอมือถือ/แท็บเล็ตเล็ก (< lg) */}
-      <div className="flex lg:hidden items-center justify-center gap-1.5 mb-2 shrink-0">
+      <div className="flex lg:hidden items-center justify-center gap-1.5 mb-2 shrink-0 bg-slate-950/60 p-1 rounded-xl border border-white/5">
         <button
           onClick={() => setMobileView('player')}
           className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
             mobileView === 'player'
-              ? 'bg-red-500 text-white shadow-xs'
-              : 'bg-white text-gray-600 border border-gray-200'
+              ? 'bg-red-600 text-white shadow-xs'
+              : 'bg-slate-900 text-slate-400 border border-slate-800'
           }`}
         >
           🔴 คุณ (เงิน & โฉนด)
@@ -1642,8 +1825,8 @@ function Game({ setCurrentPage }) {
           onClick={() => setMobileView('board')}
           className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
             mobileView === 'board'
-              ? 'bg-amber-500 text-slate-950 shadow-xs'
-              : 'bg-white text-gray-600 border border-gray-200'
+              ? 'bg-amber-400 text-slate-950 shadow-xs'
+              : 'bg-slate-900 text-slate-400 border border-slate-800'
           }`}
         >
           🎲 กระดาน
@@ -1652,8 +1835,8 @@ function Game({ setCurrentPage }) {
           onClick={() => setMobileView('bot')}
           className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
             mobileView === 'bot'
-              ? 'bg-blue-500 text-white shadow-xs'
-              : 'bg-white text-gray-600 border border-gray-200'
+              ? 'bg-cyan-600 text-slate-950 shadow-xs font-black'
+              : 'bg-slate-900 text-slate-400 border border-slate-800'
           }`}
         >
           🤖 บอท (เงิน & โฉนด)
@@ -1673,26 +1856,28 @@ function Game({ setCurrentPage }) {
           hoveredTileId={hoveredTileId}
           setHoveredTileId={setHoveredTileId}
           className={mobileView === 'player' ? 'flex' : 'hidden lg:flex'}
+          turn={turn}
+          onOpenVault={() => setActiveVaultModal('player')}
         />
 
-        {/* ================= ตรงกลาง (CENTER PANEL): กระดานเกมเศรษฐี 11x11 ================= */}
+        {/* ================= ตรงกลาง (CENTER PANEL): กระดานเกมเศรษฐี 9x9 ================= */}
         <div
           className={`${
             mobileView === 'board' ? 'flex' : 'hidden'
           } lg:flex flex-1 items-center justify-center min-h-0 min-w-0 h-full`}
         >
           <div
-            className="bg-emerald-950 p-1 sm:p-1.5 rounded-2xl shadow-xl border-4 border-amber-600 grid grid-cols-11 grid-rows-11 gap-0.5 sm:gap-1 relative aspect-square w-full h-full max-h-[calc(100vh-150px)] max-w-[calc(100vh-150px)] shrink-0"
+            className="bg-gradient-to-br from-[#061224] via-[#091b33] to-[#040e1c] p-1.5 sm:p-2 rounded-2xl shadow-[0_0_35px_rgba(245,158,11,0.25)] border-4 border-amber-500/80 grid grid-cols-9 grid-rows-9 gap-0.5 sm:gap-1 relative aspect-square w-full h-full max-h-[calc(100vh-140px)] max-w-[calc(100vh-140px)] shrink-0 select-none"
           >
-            {/* เรนเดอร์ 40 ช่องรอบกระดาน */}
+            {/* เรนเดอร์ 32 ช่องรอบกระดาน */}
             {INITIAL_TILES.map((tile) => {
-              const isPlayerHere = player.pos === tile.id
-              const isBotHere = bot.pos === tile.id
-              const isPlayerOwned = player.owned.includes(tile.id)
-              const isBotOwned = bot.owned.includes(tile.id)
-              const isHoveredFromDeed = hoveredTileId === tile.id
-              const Icon = tile.icon
-              const isCorner = [0, 10, 20, 30].includes(tile.id)
+                const isPlayerHere = player.pos === tile.id
+                const isBotHere = bot.pos === tile.id
+                const isPlayerOwned = player.owned.includes(tile.id)
+                const isBotOwned = bot.owned.includes(tile.id)
+                const isHoveredFromDeed = hoveredTileId === tile.id
+                const Icon = tile.icon
+                const isCorner = [0, 8, 16, 24].includes(tile.id)
 
               return (
                 <div
@@ -1700,29 +1885,29 @@ function Game({ setCurrentPage }) {
                   onClick={() => setInspectingTile(tile)}
                   title={`คลิกเพื่อดูรายละเอียดและค่าเช่า: ${tile.name}`}
                   className={`${tile.gridPos} ${
-                    isCorner ? 'bg-amber-100' : 'bg-amber-50'
+                    isCorner ? 'bg-amber-100 text-slate-900' : 'bg-slate-50 text-slate-900'
                   } rounded-xs sm:rounded-sm p-0.5 flex flex-col justify-between border transition-all duration-200 relative overflow-hidden select-none cursor-pointer hover:ring-2 hover:ring-amber-400 hover:scale-[1.04] active:scale-95 z-10 ${
                     isHoveredFromDeed
                       ? 'border-yellow-400 ring-4 ring-yellow-400 scale-105 z-30 shadow-xl'
                       : isPlayerHere || isBotHere
                       ? 'border-amber-400 ring-2 ring-yellow-400 shadow-md z-20'
                       : isPlayerOwned
-                      ? 'border-red-400 bg-red-50/70'
+                      ? 'border-2 border-red-500 bg-red-50/95 shadow-xs'
                       : isBotOwned
-                      ? 'border-blue-400 bg-blue-50/70'
-                      : 'border-amber-200/70'
+                      ? 'border-2 border-cyan-500 bg-cyan-50/95 shadow-xs'
+                      : 'border-slate-300/80'
                   }`}
                 >
                   {/* แถบสีหัวมุมเมือง */}
                   {tile.color && !isCorner && (
                     <div
-                      className={`h-1 sm:h-1.5 w-full rounded-2xs ${tile.color} mb-0.5 shrink-0 flex items-center justify-between px-0.5`}
+                      className={`h-1.5 sm:h-2 w-full rounded-2xs ${tile.color} mb-0.5 shrink-0 flex items-center justify-between px-0.5`}
                     >
-                      <span className="text-[6px] text-white font-black leading-none">
+                      <span className="text-[6px] text-white font-black leading-none drop-shadow-xs">
                         {isPlayerOwned
-                          ? `🔴 คุณ ${(propertyLevels[tile.id] || 1) === 2 ? '⭐⭐' : (propertyLevels[tile.id] || 1) === 3 ? '⭐⭐⭐' : ''}`
+                          ? `🔴 คุณ ${(propertyLevels[tile.id] || 1) === 2 ? '⭐⭐' : (propertyLevels[tile.id] || 1) === 3 ? '🏰 3' : '⭐ 1'}`
                           : isBotOwned
-                          ? `🤖 บอท ${(propertyLevels[tile.id] || 1) === 2 ? '⭐⭐' : (propertyLevels[tile.id] || 1) === 3 ? '⭐⭐⭐' : ''}`
+                          ? `🤖 บอท ${(propertyLevels[tile.id] || 1) === 2 ? '⭐⭐' : (propertyLevels[tile.id] || 1) === 3 ? '🏰 3' : '⭐ 1'}`
                           : ''}
                       </span>
                     </div>
@@ -1731,21 +1916,21 @@ function Game({ setCurrentPage }) {
                   {/* เนื้อหาช่อง: แสดงชื่อ และเงินอย่างชัดเจนตามคำขอ (ในแมพแสดงแค่เงินก็ได้) */}
                   <div className="flex-1 flex flex-col items-center justify-center text-center px-0.5">
                     {Icon && (
-                      <div className="text-slate-700 shrink-0">
-                        <Icon className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                      <div className="text-slate-800 shrink-0">
+                        <Icon className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
                       </div>
                     )}
-                    <p className="text-[7.5px] sm:text-[8.5px] font-bold text-gray-800 leading-tight line-clamp-2">
+                    <p className="text-[7.5px] sm:text-[8.5px] font-black text-gray-900 leading-tight line-clamp-2">
                       {tile.name}
                     </p>
 
                     {/* แสดงเงินชัดเจน: หากมีเจ้าของแสดง ค่าเช่า ถ้ายังไม่มีแสดง ราคาซื้อ */}
                     {isBotOwned ? (
-                      <p className="text-[6.5px] sm:text-[7.5px] text-rose-600 font-black leading-none mt-0.5 font-mono">
+                      <p className="text-[6.5px] sm:text-[7.5px] text-cyan-700 font-black leading-none mt-0.5 font-mono">
                         ฿{getTileRent(tile.id).toLocaleString()}
                       </p>
                     ) : isPlayerOwned ? (
-                      <p className="text-[6.5px] sm:text-[7.5px] text-emerald-700 font-black leading-none mt-0.5 font-mono">
+                      <p className="text-[6.5px] sm:text-[7.5px] text-red-600 font-black leading-none mt-0.5 font-mono">
                         ฿{getTileRent(tile.id).toLocaleString()}
                       </p>
                     ) : tile.price > 0 ? (
@@ -1759,23 +1944,23 @@ function Game({ setCurrentPage }) {
                     ) : null}
                   </div>
 
-                  {/* ตัวเดินของผู้เล่นและบอทบนช่อง */}
+                  {/* ตัวเดินของผู้เล่นและบอทบนช่อง สไตล์ 3D Pawn Pins */}
                   {(isPlayerHere || isBotHere) && (
-                    <div className="absolute inset-0 flex items-center justify-center gap-0.5 bg-black/15 backdrop-blur-[0.5px]">
+                    <div className="absolute inset-0 flex items-center justify-center gap-0.5 bg-black/20 backdrop-blur-[0.5px] z-30">
                       {isPlayerHere && (
                         <div
-                          className="bg-red-600 text-white p-0.5 rounded-full shadow-md animate-bounce z-30"
-                          title="ตัวคุณ"
+                          className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gradient-to-br from-red-500 to-rose-700 text-white flex items-center justify-center shadow-lg shadow-red-500/50 border border-white animate-bounce ring-1 ring-red-400"
+                          title="ตัวเดินของคุณ"
                         >
-                          <UserRound className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                          <UserRound className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[3]" />
                         </div>
                       )}
                       {isBotHere && (
                         <div
-                          className="bg-blue-600 text-white p-0.5 rounded-full shadow-md animate-bounce z-30"
-                          title="บอท AI"
+                          className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 text-slate-950 flex items-center justify-center shadow-lg shadow-cyan-500/50 border border-white animate-bounce ring-1 ring-cyan-300"
+                          title="ตัวเดินบอท AI"
                         >
-                          <Bot className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                          <Bot className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[3]" />
                         </div>
                       )}
                     </div>
@@ -1784,29 +1969,31 @@ function Game({ setCurrentPage }) {
               )
             })}
 
-            {/* โซนตรงกลางกระดาน (Center Area: rows 2-10, cols 2-10) */}
-            <div className="col-start-2 col-end-11 row-start-2 row-end-11 bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-900 rounded-xl p-2 sm:p-3 flex flex-col items-center justify-between text-white border-2 border-amber-500/40 shadow-inner relative overflow-hidden">
+            {/* โซนตรงกลางกระดาน (Center Area: rows 2-8, cols 2-8) สไตล์ COSMIC MONOPOLY ARENA */}
+            <div className="col-start-2 col-end-9 row-start-2 row-end-9 bg-gradient-to-br from-[#0B1E36] via-[#0E2847] to-[#071526] rounded-xl p-2 sm:p-3 flex flex-col items-center justify-between text-white border-2 border-amber-400/50 shadow-2xl relative overflow-hidden">
               
-              {/* 1. โลโก้กลางกระดาน และ ตัวบอกตาเดิน */}
+              {/* 1. โลโก้กลางกระดาน และ ตัวบอกตาเดิน สไตล์เกมเศรษฐี LINE */}
               <div className="text-center pt-0.5 shrink-0">
-                <span className="text-[8px] sm:text-[9.5px] uppercase tracking-widest text-amber-300/90 font-semibold">
-                  Project-T vs BOT AI
+                <span className="text-[8px] sm:text-[9.5px] uppercase tracking-widest text-amber-300 font-bold flex items-center justify-center gap-1">
+                  <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                  <span>PROJECT-T • MONOPOLY ARENA</span>
+                  <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                 </span>
-                <h2 className="text-base sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 drop-shadow-md leading-none">
-                  MONOPOLY
+                <h2 className="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-100 to-amber-400 drop-shadow-[0_2px_12px_rgba(245,158,11,0.5)] leading-tight">
+                  เกมเศรษฐี
                 </h2>
 
                 {/* ป้ายแสดงตาเดินปัจจุบัน */}
-                <div className="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] sm:text-[11px] font-bold bg-black/40 border border-white/20">
+                <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-full text-[9.5px] sm:text-[11px] font-black">
                   {turn === 'player' ? (
-                    <span className="text-red-300 flex items-center gap-1.5 animate-pulse">
+                    <span className="text-amber-200 bg-red-600/40 border border-red-500/60 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 animate-pulse shadow-md">
                       <UserRound className="w-3 h-3 text-red-400" />
-                      <span>ตาของคุณ (กดทอยเต๋า)</span>
+                      <span>ตาของคุณ — กดทอยเต๋าได้เลย! 🎲</span>
                     </span>
                   ) : (
-                    <span className="text-blue-300 flex items-center gap-1.5 animate-pulse">
-                      <Bot className="w-3 h-3 text-blue-400" />
-                      <span>ตาของบอท AI (กำลังดำเนินการ...)</span>
+                    <span className="text-cyan-200 bg-cyan-600/40 border border-cyan-500/60 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 animate-pulse shadow-md">
+                      <Bot className="w-3 h-3 text-cyan-400" />
+                      <span>ตาของบอท AI — กำลังคำนวณและเดิน...</span>
                     </span>
                   )}
                 </div>
@@ -1921,15 +2108,18 @@ function Game({ setCurrentPage }) {
 
                   {/* ปุ่มทอยเต๋าของผู้เล่น (ปิดการกดทันทีเมื่อทอยเสร็จ หรือเมื่อไม่ใช่ตาของผู้เล่น) */}
                   <button
-                    onClick={handlePlayerRoll}
+                    onClick={() => {
+                      playSound('dice', soundEnabled)
+                      handlePlayerRoll()
+                    }}
                     disabled={isRolling || isMoving || turn !== 'player' || hasRolled || debtCrisis || canTakeoverTile || canUpgradeTile || bankruptcyWinner}
-                    className={`flex items-center gap-1.5 px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl font-black text-xs sm:text-sm shadow-md transition transform active:scale-95 cursor-pointer ${
+                    className={`flex items-center gap-2 px-6 sm:px-8 py-2 sm:py-2.5 rounded-2xl font-black text-xs sm:text-base shadow-xl transition transform active:scale-95 cursor-pointer ${
                       turn === 'player' && !hasRolled && !isRolling && !isMoving && !debtCrisis && !canTakeoverTile && !canUpgradeTile && !bankruptcyWinner
-                        ? 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 hover:shadow-amber-500/30 ring-2 ring-amber-300/60'
-                        : 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-60'
+                        ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:to-yellow-500 text-slate-950 shadow-amber-500/50 ring-4 ring-yellow-300/80 animate-pulse hover:scale-105'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed opacity-60'
                     }`}
                   >
-                    <Dices className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isRolling ? 'animate-spin' : ''}`} />
+                    <Dices className={`w-4 h-4 sm:w-5 sm:h-5 ${isRolling ? 'animate-spin' : ''}`} />
                     <span>
                       {isRolling
                         ? 'กำลังทอย...'
@@ -1937,8 +2127,8 @@ function Game({ setCurrentPage }) {
                         ? 'กำลังเดิน... 🏃'
                         : turn === 'player' && !hasRolled
                         ? isDoubleRoll
-                          ? `ทอยพิเศษดับเบิ้ล! (${dice1 + dice2} แต้ม)`
-                          : `ทอยเต๋า (${dice1 + dice2} แต้ม)`
+                          ? `🎲 ดับเบิ้ล! ทอยอีกครั้ง (${dice1 + dice2})`
+                          : `🎲 ทอยเต๋า (ROLL)`
                         : 'ตารอบอทเล่น...'}
                     </span>
                   </button>
@@ -2239,6 +2429,8 @@ function Game({ setCurrentPage }) {
           hoveredTileId={hoveredTileId}
           setHoveredTileId={setHoveredTileId}
           className={mobileView === 'bot' ? 'flex' : 'hidden lg:flex'}
+          turn={turn}
+          onOpenVault={() => setActiveVaultModal('bot')}
         />
       </div>
 
@@ -2428,6 +2620,15 @@ function Game({ setCurrentPage }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ================= MODAL คลังธนบัตรแบบเต็ม ================= */}
+      {activeVaultModal && (
+        <BanknoteVaultModal
+          ownerType={activeVaultModal}
+          data={activeVaultModal === 'player' ? player : bot}
+          onClose={() => setActiveVaultModal(null)}
+        />
       )}
     </div>
   )
