@@ -415,7 +415,7 @@ function SavagePursuitButton({
 // ==========================================
 // ?? ???????????????????? 3 ???? (3 UNIQUE STAGES & BOSSES)
 // ==========================================
-export const STAGE_CONFIG = {
+const STAGE_CONFIG = {
   1: {
     id: 1,
     name: 'STAGE 1: SAVAGE CANYON',
@@ -1095,7 +1095,7 @@ export default function Ben10Game({ currentUser }) {
       isTimedOut: false,
       redCooldown: 0,
       lives: 3,
-      score: eng.player ? eng.player.score : 0,
+      score: 0,
       invulnerable: 0,
       attackCooldown: 0,
       isAttacking: false,
@@ -1211,7 +1211,7 @@ export default function Ben10Game({ currentUser }) {
       isTimedOut: false,
       redCooldown: 0,
       lives: 3,
-      score: 0,
+      score: stageNum === 1 ? 0 : (eng.player ? eng.player.score : 0),
       invulnerable: 0,
       attackCooldown: 0,
       isAttacking: false,
