@@ -28,6 +28,7 @@ function Aside({ currentPage, setCurrentPage }) {
     { id: 'ben10', label: 'เกมเบ็นเท็น (Ben 10)', icon: Zap },
     { id: 'uno', label: 'เกมไพ่ UNO (UNO Game)', icon: Flame },
     { id: 'cardbattle', label: 'เกมการ์ดต่อสู้ (Card Battle)', icon: Swords },
+    { id: 'vanguard', label: 'การ์ดไฟท์ แวนการ์ด (Vanguard)', icon: Swords },
     { id: 'login', label: 'เข้าสู่ระบบ (MySQL Login)', icon: LogIn },
   ]
 

@@ -12,6 +12,7 @@ import LoginPage from './pages/LoginPage'
 import MapPage from './pages/MapPage'
 import Ben10Game from './pages/Ben10Game'
 import CardBattleGame from './pages/CardBattleGame'
+import VanguardGame from './pages/VanguardGame'
 
 function App() {
   // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'map', 'about', 'guide', 'game', 'werewolf', 'uno', หรือ 'login')
@@ -31,7 +32,12 @@ function App() {
   }
 
   const isGameView =
-    currentPage === 'game' || currentPage === 'werewolf' || currentPage === 'uno' || currentPage === 'ben10' || currentPage === 'cardbattle'
+    currentPage === 'game' ||
+    currentPage === 'werewolf' ||
+    currentPage === 'uno' ||
+    currentPage === 'ben10' ||
+    currentPage === 'cardbattle' ||
+    currentPage === 'vanguard'
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
@@ -51,7 +57,9 @@ function App() {
           {/* ส่วนเนื้อหาหลักที่สลับตามปุ่มที่กด */}
           <main
             className={`flex-grow w-full mx-auto ${
-              currentPage === 'game'
+              currentPage === 'vanguard'
+                ? 'w-full px-1 sm:px-2 py-1 flex flex-col justify-center'
+                : currentPage === 'game'
                 ? 'max-w-[1480px] px-2 sm:px-4 py-2 sm:py-3 flex flex-col justify-center'
                 : currentPage === 'cardbattle'
                 ? 'max-w-[1480px] w-full px-2 py-1 flex flex-col h-[calc(100vh-4rem)] min-h-0 overflow-hidden'
@@ -73,6 +81,7 @@ function App() {
             {currentPage === 'werewolf' && <WerewolfGame setCurrentPage={setCurrentPage} />}
             {currentPage === 'uno' && <UnoGame setCurrentPage={setCurrentPage} />}
             {currentPage === 'cardbattle' && <CardBattleGame setCurrentPage={setCurrentPage} />}
+            {currentPage === 'vanguard' && <VanguardGame currentUser={currentUser} />}
           </main>
 
           {/* ส่วนท้ายเว็บ - ซ่อนในหน้าเกมเพื่อให้แสดงผลเต็มหน้าจอ 1 หน้าพอดี */}

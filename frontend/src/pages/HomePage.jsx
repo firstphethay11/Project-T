@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pin, Palette, Sparkles, Rocket, Check, ArrowRight, Zap, Play } from 'lucide-react'
+import { Pin, Palette, Sparkles, Rocket, Check, ArrowRight, Zap, Play, Swords } from 'lucide-react'
 import realisticHero from '../assets/realistic-hero.jpg'
 
 function Homepage({ setCurrentPage }) {
@@ -172,6 +172,38 @@ function Homepage({ setCurrentPage }) {
         </div>
       </section>
 
+
+      {/* ⚔️ ไฮไลท์การ์ดเกมใหม่: Cardfight!! Vanguard V-Series */}
+      <section className="bg-gradient-to-r from-slate-950 via-indigo-950 to-blue-950 rounded-3xl p-6 sm:p-8 border-2 border-cyan-500/50 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="absolute -top-12 -right-12 w-64 h-64 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex items-center gap-5 z-10">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-tr from-cyan-600 via-blue-700 to-indigo-900 border-2 border-cyan-400 p-3 flex items-center justify-center shrink-0 shadow-[0_0_25px_rgba(6,182,212,0.4)]">
+            <Swords className="w-10 h-10 text-cyan-200" />
+          </div>
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-400 text-cyan-300 text-xs font-bold mb-2">
+              <Swords className="w-3.5 h-3.5 text-cyan-400" />
+              <span>NEW TCG RELEASE: V-SERIES</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">
+              CARDFIGHT!! VANGUARD (V-SERIES)
+            </h2>
+            <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
+              ระบบจำลองการ์ดเกมแวนการ์ดสมจริง! มีทั้งระบบจัดเด็ค 50 ใบ/16 ทริกเกอร์อิสระตามกฎจริง และสนามประลองผัง V-Series (Ride / Twin Drive / Force I / Guard Circle / Damage Zone)
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0 z-10 w-full md:w-auto">
+          <button
+            onClick={() => setCurrentPage('vanguard')}
+            className="w-full md:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-400 via-sky-500 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-slate-950 font-black text-sm tracking-wider shadow-lg hover:scale-105 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            <span>เข้าสู่การประลองแวนการ์ด</span>
+          </button>
+        </div>
+      </section>
 
       {/* 🚀 ไฮไลท์เกมใหม่: Ben 10: Savage Pursuit (Retro Remake) */}
       <section className="bg-gradient-to-r from-gray-900 via-emerald-950 to-black rounded-3xl p-6 sm:p-8 border-2 border-green-500/60 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
