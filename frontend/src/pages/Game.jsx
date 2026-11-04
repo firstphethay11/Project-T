@@ -1570,11 +1570,11 @@ function Game({ setCurrentPage }) {
                   </span>
                 )}
               </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-sm sm:text-base font-black font-mono text-red-600">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-base sm:text-xl font-black font-mono text-red-600">
                   ฿{player.money.toLocaleString()}
                 </span>
-                <span className="text-[10px] font-semibold text-gray-500">
+                <span className="text-xs font-semibold text-gray-500">
                   ({player.owned.length} เมือง)
                 </span>
               </div>
@@ -1603,11 +1603,11 @@ function Game({ setCurrentPage }) {
                   </span>
                 )}
               </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-sm sm:text-base font-black font-mono text-blue-600">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-base sm:text-xl font-black font-mono text-blue-600">
                   ฿{bot.money.toLocaleString()}
                 </span>
-                <span className="text-[10px] font-semibold text-gray-500">
+                <span className="text-xs font-semibold text-gray-500">
                   ({bot.owned.length} เมือง)
                 </span>
               </div>

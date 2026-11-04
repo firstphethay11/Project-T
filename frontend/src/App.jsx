@@ -11,6 +11,7 @@ import UnoGame from './pages/UnoGame'
 import LoginPage from './pages/LoginPage'
 import MapPage from './pages/MapPage'
 import Ben10Game from './pages/Ben10Game'
+import CardBattleGame from './pages/CardBattleGame'
 
 function App() {
   // เก็บสถานะว่าตอนนี้เปิดหน้าไหนอยู่ ('home', 'map', 'about', 'guide', 'game', 'werewolf', 'uno', หรือ 'login')
@@ -30,7 +31,7 @@ function App() {
   }
 
   const isGameView =
-    currentPage === 'game' || currentPage === 'werewolf' || currentPage === 'uno' || currentPage === 'ben10'
+    currentPage === 'game' || currentPage === 'werewolf' || currentPage === 'uno' || currentPage === 'ben10' || currentPage === 'cardbattle'
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
@@ -52,6 +53,8 @@ function App() {
             className={`flex-grow w-full mx-auto ${
               currentPage === 'game'
                 ? 'max-w-[1480px] px-2 sm:px-4 py-2 sm:py-3 flex flex-col justify-center'
+                : currentPage === 'cardbattle'
+                ? 'max-w-[1480px] w-full px-2 py-1 flex flex-col h-[calc(100vh-4rem)] min-h-0 overflow-hidden'
                 : currentPage === 'uno'
                 ? 'max-w-7xl px-3 sm:px-6 py-4 flex flex-col justify-center'
                 : isGameView
@@ -69,6 +72,7 @@ function App() {
             {currentPage === 'game' && <Game setCurrentPage={setCurrentPage} />}
             {currentPage === 'werewolf' && <WerewolfGame setCurrentPage={setCurrentPage} />}
             {currentPage === 'uno' && <UnoGame setCurrentPage={setCurrentPage} />}
+            {currentPage === 'cardbattle' && <CardBattleGame setCurrentPage={setCurrentPage} />}
           </main>
 
           {/* ส่วนท้ายเว็บ - ซ่อนในหน้าเกมเพื่อให้แสดงผลเต็มหน้าจอ 1 หน้าพอดี */}
